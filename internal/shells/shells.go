@@ -1,0 +1,50 @@
+package shells
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/nattadasu/genv/internal/parser"
+)
+
+// Shell represents a shell type with its specific syntax
+type Shell interface {
+	Name() string
+	Generate(vars []parser.EnvVar) string
+	GenerateWithKeys(vars []parser.EnvVar, definedKeys map[string]bool) string
+}
+
+// GetShell returns the appropriate shell implementation
+func GetShell(name string) (Shell, error) {
+	switch strings.ToLower(name) {
+	case "sh", "bash", "zsh", "ksh", "ash":
+		return &PosixShell{shellName: name}, nil
+	case "fish":
+		return &FishShell{}, nil
+	case "powershell", "pwsh":
+		return &PowerShell{}, nil
+	case "nushell", "nu":
+		return &NushellShell{}, nil
+	case "xonsh":
+		return &XonshShell{}, nil
+	case "csh", "tcsh":
+		return &CshShell{shellName: name}, nil
+	case "cmd", "batch":
+		return &CmdShell{}, nil
+	case "ion":
+		return &IonShell{}, nil
+	case "rc":
+		return &RcShell{}, nil
+	default:
+		return nil, fmt.Errorf("unsupported shell: %s", name)
+	}
+}
+
+// GetSupportedShells returns a list of all supported shells
+func GetSupportedShells() []string {
+	return []string{
+		"sh", "bash", "zsh", "ksh", "ash",
+		"fish", "powershell", "nushell", "xonsh",
+		"csh", "tcsh", "cmd", "ion", "rc",
+	}
+}
