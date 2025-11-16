@@ -20,7 +20,7 @@ build/
 dist/
 
 # Binary output
-genv
+/genv
 genv-*
 
 # IDE specific
