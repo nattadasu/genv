@@ -596,7 +596,8 @@ jobs:
         $pwshStatus = if ($env:PWSH_STATUS) { $env:PWSH_STATUS } else { "⚠️" }
         $cmdStatus = if ($env:CMD_STATUS) { $env:CMD_STATUS } else { "⚠️" }
         
-        @" # Shell Integration Test Results (Windows)
+        @"
+        # Shell Integration Test Results (Windows)
         
         | Shell | Status | Notes |
         |-------|--------|-------|

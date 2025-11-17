@@ -44,8 +44,38 @@ func (s *NushellShell) Generate(vars []parser.EnvVar) string {
 }
 
 func escapeNushellString(s string) string {
+	// First convert $VAR references to $env.VAR
+	s = convertVarRefsToNushell(s)
+	
 	s = strings.ReplaceAll(s, "\\", "\\\\")
 	s = strings.ReplaceAll(s, "\"", "\\\"")
+	return s
+}
+
+// convertVarRefsToNushell converts $VAR to $env.VAR format
+func convertVarRefsToNushell(s string) string {
+	// Handle $VARIABLE references (but not $env. which are already converted)
+	if !strings.Contains(s, "$env.") {
+		// Match $WORD pattern and convert to $env.WORD
+		result := strings.Builder{}
+		i := 0
+		for i < len(s) {
+			if s[i] == '$' && i+1 < len(s) && (isAlphaNum(s[i+1]) || s[i+1] == '_') {
+				// Found a variable reference
+				result.WriteString("$env.")
+				i++ // Skip the $
+				// Copy the variable name
+				for i < len(s) && (isAlphaNum(s[i]) || s[i] == '_') {
+					result.WriteByte(s[i])
+					i++
+				}
+			} else {
+				result.WriteByte(s[i])
+				i++
+			}
+		}
+		return result.String()
+	}
 	return s
 }
 

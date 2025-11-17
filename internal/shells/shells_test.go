@@ -267,8 +267,8 @@ func TestEscapeFunctions(t *testing.T) {
 		if !strings.Contains(result, "`\"") {
 			t.Error("Should escape double quotes with backtick")
 		}
-		if !strings.Contains(result, "`$") {
-			t.Error("Should escape dollar signs with backtick")
+		if !strings.Contains(result, "${env:var}") {
+			t.Error("Should convert $var to ${env:var}")
 		}
 	})
 

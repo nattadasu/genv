@@ -42,9 +42,9 @@ func (s *PowerShell) GenerateWithKeys(vars []parser.EnvVar, definedKeys map[stri
 				}
 				// Check if this is a self-reference
 				if expanded == "$"+envVar.Key {
-					processedValues = append(processedValues, "${env:"+envVar.Key+"}")
+					processedValues = append(processedValues, "\"${env:"+envVar.Key+"}\"")
 				} else {
-					processedValues = append(processedValues, escapePowerShellString(expanded))
+					processedValues = append(processedValues, "\""+escapePowerShellString(expanded)+"\"")
 				}
 			}
 			// For PATH on Windows, use semicolon; colon for Unix-like
@@ -56,7 +56,7 @@ func (s *PowerShell) GenerateWithKeys(vars []parser.EnvVar, definedKeys map[stri
 			}
 
 			value := strings.Join(processedValues, arrayDelimiter)
-			sb.WriteString(fmt.Sprintf("$env:%s = \"%s\"\n", envVar.Key, value))
+			sb.WriteString(fmt.Sprintf("$env:%s = %s\n", envVar.Key, value))
 		} else {
 			var expanded string
 			if definedKeys != nil {
@@ -72,11 +72,46 @@ func (s *PowerShell) GenerateWithKeys(vars []parser.EnvVar, definedKeys map[stri
 }
 
 func escapePowerShellString(s string) string {
+	// First convert $VAR references to ${env:VAR}
+	s = convertVarRefsToPowerShell(s)
+	
 	s = strings.ReplaceAll(s, "`", "``")
 	s = strings.ReplaceAll(s, "\"", "`\"")
-	// Don't escape $ if it's part of ${env:...} or is a simple $VAR reference
-	if !strings.Contains(s, "${env:") && !strings.HasPrefix(s, "$") {
+	// Don't escape $ if it's part of ${env:...}
+	if !strings.Contains(s, "${env:") {
 		s = strings.ReplaceAll(s, "$", "`$")
 	}
 	return s
+}
+
+// convertVarRefsToPowerShell converts $VAR to ${env:VAR} format
+func convertVarRefsToPowerShell(s string) string {
+	// Handle $VARIABLE references (but not ${env:...} which are already converted)
+	if !strings.Contains(s, "${env:") {
+		// Match $WORD pattern and convert to ${env:WORD}
+		for {
+			idx := strings.Index(s, "$")
+			if idx == -1 {
+				break
+			}
+			
+			// Find the end of the variable name
+			end := idx + 1
+			for end < len(s) && (isAlphaNum(s[end]) || s[end] == '_') {
+				end++
+			}
+			
+			if end > idx+1 {
+				varName := s[idx+1 : end]
+				s = s[:idx] + "${env:" + varName + "}" + s[end:]
+			} else {
+				break
+			}
+		}
+	}
+	return s
+}
+
+func isAlphaNum(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
 }
