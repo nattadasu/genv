@@ -37,17 +37,32 @@ jobs:
 
     - name: Install Nushell
       run: |
-        wget https://github.com/nushell/nushell/releases/download/0.88.0/nu-0.88.0-x86_64-unknown-linux-gnu.tar.gz
-        tar xzf nu-0.88.0-x86_64-unknown-linux-gnu.tar.gz
-        sudo mv nu-0.88.0-x86_64-unknown-linux-gnu/nu /usr/local/bin/
+        gh release download --repo nushell/nushell --pattern '*-x86_64-unknown-linux-gnu.tar.gz'
+        tar xzf nu-*-x86_64-unknown-linux-gnu.tar.gz
+        sudo mv nu-*/nu /usr/local/bin/
         nu --version
+      env:
+        GH_TOKEN: ${{ github.token }}
+
+    - name: Setup Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+
+    - name: Cache Ion build
+      uses: actions/cache@v4
+      id: ion-cache
+      with:
+        path: ~/.cargo/bin/ion
+        key: ion-shell-${{ runner.os }}-v1
 
     - name: Install Ion shell
+      if: steps.ion-cache.outputs.cache-hit != 'true'
+      run: cargo install --git https://gitlab.redox-os.org/redox-os/ion/ --locked
+
+    - name: Setup Ion in PATH
       run: |
-        git clone https://gitlab.redox-os.org/redox-os/ion/
-        cd ion
-        cargo build --release
-        sudo cp target/release/ion /usr/local/bin/
+        sudo cp ~/.cargo/bin/ion /usr/local/bin/
         ion --version
 
     - name: Create test config
