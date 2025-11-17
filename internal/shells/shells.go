@@ -18,7 +18,7 @@ type Shell interface {
 // GetShell returns the appropriate shell implementation
 func GetShell(name string) (Shell, error) {
 	switch strings.ToLower(name) {
-	case "sh", "bash", "zsh", "ksh", "ash":
+	case "sh", "bash", "zsh", "ksh", "ash", "posix":
 		return &PosixShell{shellName: name}, nil
 	case "fish":
 		return &FishShell{}, nil
@@ -26,7 +26,7 @@ func GetShell(name string) (Shell, error) {
 		return &PowerShell{}, nil
 	case "nushell", "nu":
 		return &NushellShell{}, nil
-	case "xonsh":
+	case "xonsh", "xsh":
 		return &XonshShell{}, nil
 	case "csh", "tcsh":
 		return &CshShell{shellName: name}, nil
