@@ -20,6 +20,7 @@ jobs:
       pwsh_status: ${{ steps.set-outputs.outputs.pwsh_status }}
       nushell_status: ${{ steps.set-outputs.outputs.nushell_status }}
       ion_status: ${{ steps.set-outputs.outputs.ion_status }}
+      rc_status: ${{ steps.set-outputs.outputs.rc_status }}
     
     steps:
     - name: Checkout code
@@ -42,7 +43,8 @@ jobs:
           ksh \
           tcsh \
           fish \
-          powershell
+          powershell \
+          rc
 
     - name: Install Nushell
       run: |
@@ -223,6 +225,22 @@ jobs:
           FAILED=1
         fi
         
+        echo "=== Testing Rc ==="
+        echo "Generated script:"
+        ./genv init --path test.env rc
+        echo "---"
+        ./genv init --path test.env rc > test.rc
+        if rc -c '. ./test.rc && test "$EDITOR" = "/usr/bin/vim" && test "$GENV_TEST" = "integration" && test "$TEST_VALUE" = "hello-world" && test "$GOPATH" = "/opt/go"'; then
+          echo "RC_STATUS=✅" >> $GITHUB_ENV
+          echo "✓ Rc integration test passed"
+        else
+          echo "RC_STATUS=❌" >> $GITHUB_ENV
+          echo "✗ Rc integration test FAILED"
+          echo "Rc script contents:"
+          cat test.rc
+          FAILED=1
+        fi
+        
         echo "LINUX_FAILED=$FAILED" >> $GITHUB_ENV
         exit $FAILED
 
@@ -241,6 +259,7 @@ jobs:
         echo "| PowerShell | ${PWSH_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
         echo "| Nushell | ${NUSHELL_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
         echo "| Ion | ${ION_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Rc | ${RC_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "## Test Configuration" >> $GITHUB_STEP_SUMMARY
         echo '```toml' >> $GITHUB_STEP_SUMMARY
@@ -265,6 +284,7 @@ jobs:
         echo "pwsh_status=${PWSH_STATUS:-⚠️}" >> $GITHUB_OUTPUT
         echo "nushell_status=${NUSHELL_STATUS:-⚠️}" >> $GITHUB_OUTPUT
         echo "ion_status=${ION_STATUS:-⚠️}" >> $GITHUB_OUTPUT
+        echo "rc_status=${RC_STATUS:-⚠️}" >> $GITHUB_OUTPUT
 
   test-shells-macos:
     name: Test Shells on macOS
@@ -645,7 +665,7 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "| Platform | Status | Shells Tested |" >> $GITHUB_STEP_SUMMARY
         echo "|----------|--------|---------------|" >> $GITHUB_STEP_SUMMARY
-        echo "| Linux | ${{ needs.test-shells-linux.result == 'success' && '✅' || '❌' }} | Bash, Zsh, Ksh, Fish, Tcsh, PowerShell, Nushell, Ion |" >> $GITHUB_STEP_SUMMARY
+        echo "| Linux | ${{ needs.test-shells-linux.result == 'success' && '✅' || '❌' }} | Bash, Zsh, Ksh, Fish, Tcsh, PowerShell, Nushell, Ion, Rc |" >> $GITHUB_STEP_SUMMARY
         echo "| macOS | ${{ needs.test-shells-macos.result == 'success' && '✅' || '❌' }} | Bash, Zsh, Fish, PowerShell, Nushell |" >> $GITHUB_STEP_SUMMARY
         echo "| Windows | ${{ needs.test-shells-windows.result == 'success' && '✅' || '❌' }} | PowerShell, CMD |" >> $GITHUB_STEP_SUMMARY
         echo "| Syntax | ${{ needs.syntax-verification.result == 'success' && '✅' || '❌' }} | Bash, Zsh, Fish, PowerShell |" >> $GITHUB_STEP_SUMMARY
@@ -668,6 +688,7 @@ jobs:
             echo "| PowerShell | ${{ needs.test-shells-linux.outputs.pwsh_status }} |" >> $GITHUB_STEP_SUMMARY
             echo "| Nushell | ${{ needs.test-shells-linux.outputs.nushell_status }} |" >> $GITHUB_STEP_SUMMARY
             echo "| Ion | ${{ needs.test-shells-linux.outputs.ion_status }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Rc | ${{ needs.test-shells-linux.outputs.rc_status }} |" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
           
@@ -702,4 +723,4 @@ jobs:
         echo "- Shell syntax validation" >> $GITHUB_STEP_SUMMARY
         echo "- Ion colon-separated arrays (no array export support)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "## Total Shells Tested: 15+" >> $GITHUB_STEP_SUMMARY
+        echo "## Total Shells Tested: 16" >> $GITHUB_STEP_SUMMARY
