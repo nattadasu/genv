@@ -105,9 +105,6 @@ func convertToEnvVars(rawConfig map[string]interface{}) *ParseResult {
 		envVars = append(envVars, envVar)
 	}
 
-	// Sort environment variables alphabetically, but PATH must be at the end
-	sortEnvVars(envVars)
-
 	return &ParseResult{
 		EnvVars:  envVars,
 		Warnings: warnings,
@@ -118,34 +115,6 @@ func convertToEnvVars(rawConfig map[string]interface{}) *ParseResult {
 func isPathOrDirsKey(key string) bool {
 	upper := strings.ToUpper(key)
 	return strings.HasSuffix(upper, "PATH") || strings.HasSuffix(upper, "DIRS")
-}
-
-// sortEnvVars sorts environment variables alphabetically, with PATH at the end
-func sortEnvVars(envVars []EnvVar) {
-	// Separate PATH and non-PATH variables
-	var pathVars []EnvVar
-	var normalVars []EnvVar
-
-	for _, v := range envVars {
-		if strings.ToUpper(v.Key) == "PATH" {
-			pathVars = append(pathVars, v)
-		} else {
-			normalVars = append(normalVars, v)
-		}
-	}
-
-	// Sort non-PATH variables alphabetically
-	for i := 0; i < len(normalVars)-1; i++ {
-		for j := i + 1; j < len(normalVars); j++ {
-			if normalVars[i].Key > normalVars[j].Key {
-				normalVars[i], normalVars[j] = normalVars[j], normalVars[i]
-			}
-		}
-	}
-
-	// Copy back to original slice: sorted vars first, then PATH
-	copy(envVars, normalVars)
-	copy(envVars[len(normalVars):], pathVars)
 }
 
 // ExpandEnvVar expands environment variable references like $PATH and tilde (~)

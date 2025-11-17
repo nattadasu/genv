@@ -42,6 +42,7 @@ func handleInitCommand() {
 	configPath := initCmd.String("path", "", "Path to custom config file (default: ~/.genv.env)")
 	showWarnings := initCmd.Bool("warnings", false, "Show warnings about variable references")
 	dedupePath := initCmd.Bool("dedupe-path", false, "Remove duplicate entries from PATH-like variables")
+	sortKeys := initCmd.Bool("sort", false, "Sort variables alphabetically (PATH always last)")
 	showHelp := initCmd.Bool("help", false, "Show help for init command")
 
 	if err := initCmd.Parse(os.Args[2:]); err != nil {
@@ -62,11 +63,11 @@ func handleInitCommand() {
 	}
 
 	shellName := initCmd.Arg(0)
-	handleInit(shellName, *configPath, *showWarnings, *dedupePath)
+	handleInit(shellName, *configPath, *showWarnings, *dedupePath, *sortKeys)
 }
 
-func handleInit(shellName, configPath string, showWarnings, dedupePath bool) {
-	script, err := generator.GenerateWithOptions(shellName, configPath, showWarnings, dedupePath)
+func handleInit(shellName, configPath string, showWarnings, dedupePath, sortKeys bool) {
+	script, err := generator.GenerateWithOptions(shellName, configPath, showWarnings, dedupePath, sortKeys)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
@@ -87,6 +88,7 @@ func printUsage() {
 	fmt.Println("  --path <file>      Path to custom config file (default: ~/.genv.env)")
 	fmt.Println("  --warnings         Show warnings about variable references")
 	fmt.Println("  --dedupe-path      Remove duplicate entries from PATH-like variables")
+	fmt.Println("  --sort             Sort variables alphabetically (may cause conflicts)")
 	fmt.Println("  --help             Show detailed help for init command")
 	fmt.Println()
 	fmt.Println("Supported shells:")
@@ -121,6 +123,10 @@ func printInitHelp() {
 	fmt.Println()
 	fmt.Println("  --dedupe-path      Remove duplicate PATH entries at runtime")
 	fmt.Println("                     Works with: bash, zsh, fish, pwsh, nu, xonsh")
+	fmt.Println()
+	fmt.Println("  --sort             Sort variables alphabetically with PATH last")
+	fmt.Println("                     Warning: May cause issues if variables depend")
+	fmt.Println("                     on each other's definition order")
 	fmt.Println()
 	fmt.Println("  --help             Show this help message")
 	fmt.Println()
