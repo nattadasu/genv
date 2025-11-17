@@ -145,10 +145,15 @@ eval $(genv init ion)
 eval `{genv init rc}
 ```
 
-**CMD (Windows)** - Create `genv-init.bat`:
+**CMD (Windows)** - Create batch file:
 ```batch
 genv init cmd > %USERPROFILE%\genv-init.bat
 call %USERPROFILE%\genv-init.bat
+```
+
+**Clink (CMD with Lua)** - Add to `%LOCALAPPDATA%\clink\genv.lua`:
+```lua
+load(io.popen('genv init clink'):read('*a'))()
 ```
 
 </details>
@@ -282,6 +287,10 @@ Python-style lists with proper `$VARIABLE` references.
 - **Ion**: Limited array support  
 - **Rc**: Limited string manipulation
 - **CMD**: Basic variable setting only
+
+### Clink
+
+Clink is a CMD enhancement for Windows that supports Lua scripting. Variables like `$GOPATH` are automatically converted to `os.getenv('GOPATH')`. Clink auto-loads Lua files from `%LOCALAPPDATA%\clink\`, making it more convenient than batch files.
 
 ## Development
 
