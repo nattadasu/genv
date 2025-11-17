@@ -75,7 +75,7 @@ func (s *PowerShell) GenerateWithKeys(vars []parser.EnvVar, definedKeys map[stri
 func escapePowerShellString(s string) string {
 	// First convert $VAR references to ${env:VAR}
 	s = convertVarRefsToPowerShell(s)
-	
+
 	s = strings.ReplaceAll(s, "`", "``")
 	s = strings.ReplaceAll(s, "\"", "`\"")
 	// Don't escape $ if it's part of ${env:...}
@@ -95,13 +95,13 @@ func convertVarRefsToPowerShell(s string) string {
 			if idx == -1 {
 				break
 			}
-			
+
 			// Find the end of the variable name
 			end := idx + 1
 			for end < len(s) && (isAlphaNum(s[end]) || s[end] == '_') {
 				end++
 			}
-			
+
 			if end > idx+1 {
 				varName := s[idx+1 : end]
 				s = s[:idx] + "${env:" + varName + "}" + s[end:]
@@ -162,7 +162,7 @@ func (s *PowerShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[s
 			// Join with proper PowerShell syntax: ("item1", "item2") -join ":"
 			value := fmt.Sprintf("(%s) -join '%s'", strings.Join(processedValues, ", "), arrayDelimiter)
 			sb.WriteString(fmt.Sprintf("$env:%s = %s\n", envVar.Key, value))
-			
+
 			// Add deduplication call if requested and variable is PATH-like
 			if dedupePath && isPathLikeVar(envVar.Key) {
 				sb.WriteString(fmt.Sprintf("$env:%s = __genv_dedupe_path $env:%s\n", envVar.Key, envVar.Key))

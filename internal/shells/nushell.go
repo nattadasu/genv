@@ -58,7 +58,7 @@ func (s *NushellShell) Generate(vars []parser.EnvVar) string {
 func escapeNushellString(s string) string {
 	// First convert $VAR references to $env.VAR
 	s = convertVarRefsToNushell(s)
-	
+
 	s = strings.ReplaceAll(s, "\\", "\\\\")
 	s = strings.ReplaceAll(s, "\"", "\\\"")
 	return s
@@ -97,7 +97,7 @@ func convertVarRefsToNushell(s string) string {
 func convertToNushellInterpolation(s string) string {
 	result := strings.Builder{}
 	i := 0
-	
+
 	for i < len(s) {
 		if i < len(s)-5 && s[i:i+5] == "$env." {
 			// Found $env. reference, wrap it in parentheses
@@ -114,7 +114,7 @@ func convertToNushellInterpolation(s string) string {
 			i++
 		}
 	}
-	
+
 	return result.String()
 }
 
@@ -154,7 +154,7 @@ func (s *NushellShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map
 			}
 			value := strings.Join(processedValues, ", ")
 			sb.WriteString(fmt.Sprintf("$env.%s = [%s]\n", envVar.Key, value))
-			
+
 			// Add deduplication call if requested and variable is PATH-like
 			if dedupePath && isPathLikeVar(envVar.Key) {
 				sb.WriteString(fmt.Sprintf("$env.%s = (__genv_dedupe_path $env.%s)\n", envVar.Key, envVar.Key))

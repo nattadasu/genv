@@ -74,6 +74,6 @@ func convertDollarToPercent(s string) string {
 }
 
 func (s *CmdShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[string]bool, dedupePath bool) string {
-// Deduplication not applicable to CMD
-return s.GenerateWithKeys(vars, definedKeys)
+	// Deduplication not applicable to CMD
+	return s.GenerateWithKeys(vars, definedKeys)
 }

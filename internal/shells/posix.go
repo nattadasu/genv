@@ -58,7 +58,7 @@ func (s *PosixShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[s
 			}
 			value := strings.Join(processedValues, ":")
 			sb.WriteString(fmt.Sprintf("export %s=\"%s\"\n", envVar.Key, value))
-			
+
 			// Add deduplication call if requested and variable is PATH-like
 			if dedupePath && isPathLikeVar(envVar.Key) {
 				sb.WriteString(fmt.Sprintf("export %s=\"$(__genv_dedupe_path \"$%s\")\"\n", envVar.Key, envVar.Key))

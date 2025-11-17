@@ -90,7 +90,7 @@ func (s *XonshShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[s
 			}
 			value := strings.Join(processedValues, ", ")
 			sb.WriteString(fmt.Sprintf("$%s = [%s]\n", envVar.Key, value))
-			
+
 			// Add deduplication call if requested and variable is PATH-like
 			if dedupePath && isPathLikeVar(envVar.Key) {
 				sb.WriteString(fmt.Sprintf("$%s = __genv_dedupe_path($%s)\n", envVar.Key, envVar.Key))

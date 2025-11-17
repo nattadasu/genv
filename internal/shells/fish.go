@@ -81,7 +81,7 @@ func (s *FishShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[st
 			}
 			value := strings.Join(processedValues, " ")
 			sb.WriteString(fmt.Sprintf("set -gx %s %s\n", envVar.Key, value))
-			
+
 			// Add deduplication call if requested and variable is PATH-like
 			if dedupePath && isPathLikeVar(envVar.Key) {
 				sb.WriteString(fmt.Sprintf("set -gx %s (__genv_dedupe_path $%s)\n", envVar.Key, envVar.Key))
