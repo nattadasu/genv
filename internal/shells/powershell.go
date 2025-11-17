@@ -55,7 +55,8 @@ func (s *PowerShell) GenerateWithKeys(vars []parser.EnvVar, definedKeys map[stri
 				arrayDelimiter = delimiter
 			}
 
-			value := strings.Join(processedValues, arrayDelimiter)
+			// Join with proper PowerShell syntax: ("item1", "item2") -join ":"
+			value := fmt.Sprintf("(%s) -join '%s'", strings.Join(processedValues, ", "), arrayDelimiter)
 			sb.WriteString(fmt.Sprintf("$env:%s = %s\n", envVar.Key, value))
 		} else {
 			var expanded string
@@ -158,7 +159,8 @@ func (s *PowerShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[s
 				arrayDelimiter = delimiter
 			}
 
-			value := strings.Join(processedValues, arrayDelimiter)
+			// Join with proper PowerShell syntax: ("item1", "item2") -join ":"
+			value := fmt.Sprintf("(%s) -join '%s'", strings.Join(processedValues, ", "), arrayDelimiter)
 			sb.WriteString(fmt.Sprintf("$env:%s = %s\n", envVar.Key, value))
 			
 			// Add deduplication call if requested and variable is PATH-like
