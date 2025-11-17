@@ -111,8 +111,14 @@ INVALID TOML = = =
 
 func TestExpandEnvVar(t *testing.T) {
 	// Set a test environment variable
-	_ = os.Setenv("TEST_VAR", "test_value")
-	defer func() { _ = os.Unsetenv("TEST_VAR") }()
+	if err := os.Setenv("TEST_VAR", "test_value"); err != nil {
+		t.Fatalf("Failed to set TEST_VAR: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("TEST_VAR"); err != nil {
+			t.Errorf("Failed to unset TEST_VAR: %v", err)
+		}
+	}()
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
