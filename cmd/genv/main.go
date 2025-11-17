@@ -43,7 +43,10 @@ func handleInitCommand() {
 	showWarnings := initCmd.Bool("warnings", false, "Show warnings about variable references")
 	showHelp := initCmd.Bool("help", false, "Show help for init command")
 
-	initCmd.Parse(os.Args[2:])
+	if err := initCmd.Parse(os.Args[2:]); err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing flags: %v\n", err)
+		os.Exit(1)
+	}
 
 	if *showHelp {
 		printInitHelp()

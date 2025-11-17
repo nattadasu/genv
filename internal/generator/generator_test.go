@@ -14,8 +14,8 @@ func TestGenerate(t *testing.T) {
 
 	// Override home directory for testing
 	originalHome := os.Getenv("HOME")
-	os.Setenv("HOME", homeDir)
-	defer os.Setenv("HOME", originalHome)
+	_ = os.Setenv("HOME", homeDir)
+	defer func() { _ = os.Setenv("HOME", originalHome) }()
 
 	configPath := filepath.Join(homeDir, ".genv.env")
 	content := `
@@ -79,8 +79,8 @@ PATH = [
 func TestGenerateFileNotFound(t *testing.T) {
 	// Set HOME to a non-existent directory
 	originalHome := os.Getenv("HOME")
-	os.Setenv("HOME", "/nonexistent/directory")
-	defer os.Setenv("HOME", originalHome)
+	_ = os.Setenv("HOME", "/nonexistent/directory")
+	defer func() { _ = os.Setenv("HOME", originalHome) }()
 
 	_, err := Generate("bash", "", false)
 	if err == nil {
@@ -94,8 +94,8 @@ func TestGenerateUnsupportedShell(t *testing.T) {
 	homeDir := tmpDir
 
 	originalHome := os.Getenv("HOME")
-	os.Setenv("HOME", homeDir)
-	defer os.Setenv("HOME", originalHome)
+	_ = os.Setenv("HOME", homeDir)
+	defer func() { _ = os.Setenv("HOME", originalHome) }()
 
 	configPath := filepath.Join(homeDir, ".genv.env")
 	content := `EDITOR = "/usr/bin/vim"`
