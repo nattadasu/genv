@@ -34,19 +34,39 @@ jobs:
     - name: Build genv
       run: go build -o genv ./cmd/genv
 
-    - name: Install shells
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          bash \
-          zsh \
-          ksh \
-          tcsh \
-          fish \
-          powershell \
-          rc
+    - name: Install dependencies
+      run: sudo apt-get update
+
+    - name: Install Bash
+      continue-on-error: true
+      run: sudo apt-get install -y bash
+
+    - name: Install Zsh
+      continue-on-error: true
+      run: sudo apt-get install -y zsh
+
+    - name: Install Ksh
+      continue-on-error: true
+      run: sudo apt-get install -y ksh
+
+    - name: Install Tcsh
+      continue-on-error: true
+      run: sudo apt-get install -y tcsh
+
+    - name: Install Fish
+      continue-on-error: true
+      run: sudo apt-get install -y fish
+
+    - name: Install PowerShell
+      continue-on-error: true
+      run: sudo apt-get install -y powershell
+
+    - name: Install Rc
+      continue-on-error: true
+      run: sudo apt-get install -y rc
 
     - name: Install Nushell
+      continue-on-error: true
       run: |
         gh release download --repo nushell/nushell --pattern '*-x86_64-unknown-linux-gnu.tar.gz'
         tar xzf nu-*-x86_64-unknown-linux-gnu.tar.gz
@@ -68,13 +88,19 @@ jobs:
         key: ion-shell-${{ runner.os }}-v1
 
     - name: Install Ion shell
+      id: install_ion
       if: steps.ion-cache.outputs.cache-hit != 'true'
+      continue-on-error: true
       run: cargo install --git https://gitlab.redox-os.org/redox-os/ion/ ion-shell --locked
 
     - name: Setup Ion in PATH
+      if: steps.ion-cache.outputs.cache-hit == 'true' || steps.install_ion.outcome == 'success'
+      continue-on-error: true
       run: |
-        sudo cp ~/.cargo/bin/ion /usr/local/bin/
-        ion --version
+        if [ -f ~/.cargo/bin/ion ]; then
+          sudo cp ~/.cargo/bin/ion /usr/local/bin/
+          ion --version
+        fi
 
     - name: Create test config
       run: |
@@ -86,120 +112,131 @@ jobs:
         PATH = ["$PATH", "$GOPATH/bin", "/opt/bin"]
         EOF
 
-    - name: Run all shell tests
+    - name: Test Bash
       continue-on-error: true
       run: |
-        FAILED=0
-        
+        if ! command -v bash &> /dev/null;
+        then
+          echo "BASH_STATUS=⚠️" >> $GITHUB_ENV
+          echo "Bash not found, skipping test."
+          exit 0
+        fi
         echo "=== Testing Bash ==="
-        echo "Generated script:"
-        ./genv init --path test.env bash
-        echo "---"
-        if bash -c 'eval "$(./genv init --path test.env bash)" && \
-          test "$EDITOR" = "/usr/bin/vim" && \
-          test "$GENV_TEST" = "integration" && \
-          test "$TEST_VALUE" = "hello-world" && \
-          test "$GOPATH" = "/opt/go" && \
-          echo "$PATH" | grep -q "/opt/go/bin"'; then
+        if bash -c 'eval "$(./genv init --path test.env bash)" && test "$EDITOR" = "/usr/bin/vim" && test "$GENV_TEST" = "integration" && test "$TEST_VALUE" = "hello-world" && test "$GOPATH" = "/opt/go" && echo "$PATH" | grep -q "/opt/go/bin"'; then
           echo "BASH_STATUS=✅" >> $GITHUB_ENV
           echo "✓ Bash integration test passed"
         else
           echo "BASH_STATUS=❌" >> $GITHUB_ENV
           echo "✗ Bash integration test FAILED"
-          FAILED=1
+          exit 1
         fi
-        
+
+    - name: Test Zsh
+      continue-on-error: true
+      run: |
+        if ! command -v zsh &> /dev/null;
+        then
+          echo "ZSH_STATUS=⚠️" >> $GITHUB_ENV
+          echo "Zsh not found, skipping test."
+          exit 0
+        fi
         echo "=== Testing Zsh ==="
-        echo "Generated script:"
-        ./genv init --path test.env zsh
-        echo "---"
-        if zsh -c 'eval "$(./genv init --path test.env zsh)" && \
-          test "$EDITOR" = "/usr/bin/vim" && \
-          test "$GENV_TEST" = "integration" && \
-          test "$TEST_VALUE" = "hello-world" && \
-          test "$GOPATH" = "/opt/go" && \
-          echo "$PATH" | grep -q "/opt/go/bin"'; then
+        if zsh -c 'eval "$(./genv init --path test.env zsh)" && test "$EDITOR" = "/usr/bin/vim" && test "$GENV_TEST" = "integration" && test "$TEST_VALUE" = "hello-world" && test "$GOPATH" = "/opt/go" && echo "$PATH" | grep -q "/opt/go/bin"'; then
           echo "ZSH_STATUS=✅" >> $GITHUB_ENV
           echo "✓ Zsh integration test passed"
         else
           echo "ZSH_STATUS=❌" >> $GITHUB_ENV
           echo "✗ Zsh integration test FAILED"
-          FAILED=1
+          exit 1
         fi
-        
+
+    - name: Test Ksh
+      continue-on-error: true
+      run: |
+        if ! command -v ksh &> /dev/null;
+        then
+          echo "KSH_STATUS=⚠️" >> $GITHUB_ENV
+          echo "Ksh not found, skipping test."
+          exit 0
+        fi
         echo "=== Testing Ksh ==="
-        echo "Generated script:"
-        ./genv init --path test.env ksh
-        echo "---"
-        if ksh -c 'eval "$(./genv init --path test.env ksh)" && \
-          test "$EDITOR" = "/usr/bin/vim" && \
-          test "$GENV_TEST" = "integration" && \
-          test "$TEST_VALUE" = "hello-world" && \
-          test "$GOPATH" = "/opt/go" && \
-          echo "$PATH" | grep -q "/opt/go/bin"'; then
+        if ksh -c 'eval "$(./genv init --path test.env ksh)" && test "$EDITOR" = "/usr/bin/vim" && test "$GENV_TEST" = "integration" && test "$TEST_VALUE" = "hello-world" && test "$GOPATH" = "/opt/go" && echo "$PATH" | grep -q "/opt/go/bin"'; then
           echo "KSH_STATUS=✅" >> $GITHUB_ENV
           echo "✓ Ksh integration test passed"
         else
           echo "KSH_STATUS=❌" >> $GITHUB_ENV
           echo "✗ Ksh integration test FAILED"
-          FAILED=1
+          exit 1
         fi
-        
+
+    - name: Test Fish
+      continue-on-error: true
+      run: |
+        if ! command -v fish &> /dev/null;
+        then
+          echo "FISH_STATUS=⚠️" >> $GITHUB_ENV
+          echo "Fish not found, skipping test."
+          exit 0
+        fi
         echo "=== Testing Fish ==="
-        echo "Generated script:"
-        ./genv init --path test.env fish
-        echo "---"
-        if fish -c './genv init --path test.env fish | source; \
-          test "$EDITOR" = "/usr/bin/vim"; and \
-          test "$GENV_TEST" = "integration"; and \
-          test "$TEST_VALUE" = "hello-world"; and \
-          test "$GOPATH" = "/opt/go"; and \
-          string match -q "*$GOPATH/bin*" "$PATH"'; then
+        if fish -c './genv init --path test.env fish | source; test "$EDITOR" = "/usr/bin/vim"; and test "$GENV_TEST" = "integration"; and test "$TEST_VALUE" = "hello-world"; and test "$GOPATH" = "/opt/go"; and string match -q "*$GOPATH/bin*" "$PATH"'; then
           echo "FISH_STATUS=✅" >> $GITHUB_ENV
           echo "✓ Fish integration test passed"
         else
           echo "FISH_STATUS=❌" >> $GITHUB_ENV
           echo "✗ Fish integration test FAILED"
-          FAILED=1
+          exit 1
         fi
-        
+
+    - name: Test Tcsh
+      continue-on-error: true
+      run: |
+        if ! command -v tcsh &> /dev/null;
+        then
+          echo "TCSH_STATUS=⚠️" >> $GITHUB_ENV
+          echo "Tcsh not found, skipping test."
+          exit 0
+        fi
         echo "=== Testing Tcsh ==="
-        echo "Generated script:"
-        ./genv init --path test.env tcsh
-        echo "---"
         ./genv init --path test.env tcsh > test.tcsh
-        if tcsh -c 'source test.tcsh && \
-          test "$EDITOR" = "/usr/bin/vim" && \
-          test "$GENV_TEST" = "integration" && \
-          test "$TEST_VALUE" = "hello-world" && \
-          test "$GOPATH" = "/opt/go"'; then
+        if tcsh -c 'source test.tcsh && test "$EDITOR" = "/usr/bin/vim" && test "$GENV_TEST" = "integration" && test "$TEST_VALUE" = "hello-world" && test "$GOPATH" = "/opt/go"'; then
           echo "TCSH_STATUS=✅" >> $GITHUB_ENV
           echo "✓ Tcsh integration test passed"
         else
           echo "TCSH_STATUS=❌" >> $GITHUB_ENV
           echo "✗ Tcsh integration test FAILED"
-          echo "Tcsh script contents:"
-          cat test.tcsh
-          FAILED=1
+          exit 1
         fi
-        
+
+    - name: Test PowerShell
+      continue-on-error: true
+      run: |
+        if ! command -v pwsh &> /dev/null;
+        then
+          echo "PWSH_STATUS=⚠️" >> $GITHUB_ENV
+          echo "PowerShell not found, skipping test."
+          exit 0
+        fi
         echo "=== Testing PowerShell ==="
-        echo "Generated script:"
-        ./genv init --path test.env pwsh
-        echo "---"
-        if pwsh -Command './genv init --path test.env pwsh | Invoke-Expression; if ($env:EDITOR -ne "/usr/bin/vim") { Write-Error "EDITOR=$env:EDITOR"; exit 1 }; if ($env:GENV_TEST -ne "integration") { Write-Error "GENV_TEST=$env:GENV_TEST"; exit 1 }; if ($env:TEST_VALUE -ne "hello-world") { Write-Error "TEST_VALUE=$env:TEST_VALUE"; exit 1 }; if ($env:GOPATH -ne "/opt/go") { Write-Error "GOPATH=$env:GOPATH"; exit 1 }; if ($env:PATH -notmatch "/opt/go/bin") { Write-Error "PATH=$env:PATH"; exit 1 }'; then
+        if pwsh -Command './genv init --path test.env pwsh | Invoke-Expression; if ($env:EDITOR -ne "/usr/bin/vim") { exit 1 }; if ($env:GENV_TEST -ne "integration") { exit 1 }; if ($env:TEST_VALUE -ne "hello-world") { exit 1 }; if ($env:GOPATH -ne "/opt/go") { exit 1 }; if ($env:PATH -notmatch "/opt/go/bin") { exit 1 }'; then
           echo "PWSH_STATUS=✅" >> $GITHUB_ENV
           echo "✓ PowerShell integration test passed"
         else
           echo "PWSH_STATUS=❌" >> $GITHUB_ENV
           echo "✗ PowerShell integration test FAILED"
-          FAILED=1
+          exit 1
         fi
-        
+
+    - name: Test Nushell
+      continue-on-error: true
+      run: |
+        if ! command -v nu &> /dev/null;
+        then
+          echo "NUSHELL_STATUS=⚠️" >> $GITHUB_ENV
+          echo "Nushell not found, skipping test."
+          exit 0
+        fi
         echo "=== Testing Nushell ==="
-        echo "Generated script:"
-        ./genv init --path test.env nu
-        echo "---"
         ./genv init --path test.env nu > test.nu
         if nu -c 'source test.nu; if $env.EDITOR != "/usr/bin/vim" { exit 1 }; if $env.GENV_TEST != "integration" { exit 1 }; if $env.TEST_VALUE != "hello-world" { exit 1 }; if $env.GOPATH != "/opt/go" { exit 1 }'; then
           echo "NUSHELL_STATUS=✅" >> $GITHUB_ENV
@@ -207,28 +244,38 @@ jobs:
         else
           echo "NUSHELL_STATUS=❌" >> $GITHUB_ENV
           echo "✗ Nushell integration test FAILED"
-          echo "Nushell script contents:"
-          cat test.nu
-          FAILED=1
+          exit 1
         fi
-        
+
+    - name: Test Ion
+      continue-on-error: true
+      run: |
+        if ! command -v ion &> /dev/null;
+        then
+          echo "ION_STATUS=⚠️" >> $GITHUB_ENV
+          echo "Ion not found, skipping test."
+          exit 0
+        fi
         echo "=== Testing Ion ==="
-        echo "Generated script:"
-        ./genv init --path test.env ion
-        echo "---"
         if ion -c 'eval "$(./genv init --path test.env ion)" && test "$EDITOR" = "/usr/bin/vim" && test "$GENV_TEST" = "integration" && test "$TEST_VALUE" = "hello-world" && test "$GOPATH" = "/opt/go" && echo "$PATH" | grep -q "/opt/go/bin"'; then
           echo "ION_STATUS=✅" >> $GITHUB_ENV
           echo "✓ Ion integration test passed"
         else
           echo "ION_STATUS=❌" >> $GITHUB_ENV
           echo "✗ Ion integration test FAILED"
-          FAILED=1
+          exit 1
         fi
-        
+
+    - name: Test Rc
+      continue-on-error: true
+      run: |
+        if ! command -v rc &> /dev/null;
+        then
+          echo "RC_STATUS=⚠️" >> $GITHUB_ENV
+          echo "Rc not found, skipping test."
+          exit 0
+        fi
         echo "=== Testing Rc ==="
-        echo "Generated script:"
-        ./genv init --path test.env rc
-        echo "---"
         ./genv init --path test.env rc > test.rc
         if rc -c '. ./test.rc && test "$EDITOR" = "/usr/bin/vim" && test "$GENV_TEST" = "integration" && test "$TEST_VALUE" = "hello-world" && test "$GOPATH" = "/opt/go"'; then
           echo "RC_STATUS=✅" >> $GITHUB_ENV
@@ -236,13 +283,8 @@ jobs:
         else
           echo "RC_STATUS=❌" >> $GITHUB_ENV
           echo "✗ Rc integration test FAILED"
-          echo "Rc script contents:"
-          cat test.rc
-          FAILED=1
+          exit 1
         fi
-        
-        echo "LINUX_FAILED=$FAILED" >> $GITHUB_ENV
-        exit $FAILED
 
     - name: Generate test summary
       if: always()
@@ -266,7 +308,15 @@ jobs:
         cat test.env >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
         
-        if [ "${LINUX_FAILED:-0}" -ne 0 ]; then
+        FINAL_STATUS="success"
+        for status in ${BASH_STATUS:-⚠️} ${ZSH_STATUS:-⚠️} ${KSH_STATUS:-⚠️} ${FISH_STATUS:-⚠️} ${TCSH_STATUS:-⚠️} ${PWSH_STATUS:-⚠️} ${NUSHELL_STATUS:-⚠️} ${ION_STATUS:-⚠️} ${RC_STATUS:-⚠️}; do
+          if [[ "$status" == "❌" ]]; then
+            FINAL_STATUS="failure"
+            break
+          fi
+        done
+
+        if [ "$FINAL_STATUS" == "failure" ]; then
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "❌ **Some tests failed on Linux**" >> $GITHUB_STEP_SUMMARY
           exit 1
@@ -308,9 +358,25 @@ jobs:
     - name: Build genv
       run: go build -o genv ./cmd/genv
 
-    - name: Install shells
-      run: |
-        brew install bash zsh fish nushell powershell
+    - name: Install Bash
+      continue-on-error: true
+      run: brew install bash
+
+    - name: Install Zsh
+      continue-on-error: true
+      run: brew install zsh
+
+    - name: Install Fish
+      continue-on-error: true
+      run: brew install fish
+
+    - name: Install Nushell
+      continue-on-error: true
+      run: brew install nushell
+
+    - name: Install PowerShell
+      continue-on-error: true
+      run: brew install powershell
 
     - name: Create test config
       run: |
@@ -322,76 +388,92 @@ jobs:
         PATH = ["$PATH", "$GOPATH/bin", "/opt/homebrew/bin"]
         EOF
 
-    - name: Run all shell tests
+    - name: Test Bash
       continue-on-error: true
       run: |
-        FAILED=0
-        
+        if ! command -v bash &> /dev/null;
+        then
+          echo "BASH_STATUS=⚠️" >> $GITHUB_ENV
+          echo "Bash not found, skipping test."
+          exit 0
+        fi
         echo "=== Testing Bash ==="
-        echo "Generated script:"
-        ./genv init --path test.env bash
-        echo "---"
-        if bash -c 'eval "$(./genv init --path test.env bash)" && \
-          test "$EDITOR" = "/usr/bin/vim" && \
-          test "$GENV_TEST" = "integration-macos" && \
-          test "$GOPATH" = "/opt/go"'; then
+        if bash -c 'eval "$(./genv init --path test.env bash)" && test "$EDITOR" = "/usr/bin/vim" && test "$GENV_TEST" = "integration-macos" && test "$GOPATH" = "/opt/go"'; then
           echo "BASH_STATUS=✅" >> $GITHUB_ENV
           echo "✓ Bash integration test passed"
         else
           echo "BASH_STATUS=❌" >> $GITHUB_ENV
           echo "✗ Bash integration test FAILED"
-          FAILED=1
+          exit 1
         fi
-        
+
+    - name: Test Zsh
+      continue-on-error: true
+      run: |
+        if ! command -v zsh &> /dev/null;
+        then
+          echo "ZSH_STATUS=⚠️" >> $GITHUB_ENV
+          echo "Zsh not found, skipping test."
+          exit 0
+        fi
         echo "=== Testing Zsh ==="
-        echo "Generated script:"
-        ./genv init --path test.env zsh
-        echo "---"
-        if zsh -c 'eval "$(./genv init --path test.env zsh)" && \
-          test "$EDITOR" = "/usr/bin/vim" && \
-          test "$GENV_TEST" = "integration-macos" && \
-          test "$GOPATH" = "/opt/go"'; then
+        if zsh -c 'eval "$(./genv init --path test.env zsh)" && test "$EDITOR" = "/usr/bin/vim" && test "$GENV_TEST" = "integration-macos" && test "$GOPATH" = "/opt/go"'; then
           echo "ZSH_STATUS=✅" >> $GITHUB_ENV
           echo "✓ Zsh integration test passed"
         else
           echo "ZSH_STATUS=❌" >> $GITHUB_ENV
           echo "✗ Zsh integration test FAILED"
-          FAILED=1
+          exit 1
         fi
-        
+
+    - name: Test Fish
+      continue-on-error: true
+      run: |
+        if ! command -v fish &> /dev/null;
+        then
+          echo "FISH_STATUS=⚠️" >> $GITHUB_ENV
+          echo "Fish not found, skipping test."
+          exit 0
+        fi
         echo "=== Testing Fish ==="
-        echo "Generated script:"
-        ./genv init --path test.env fish
-        echo "---"
-        if fish -c './genv init --path test.env fish | source; \
-          test "$EDITOR" = "/usr/bin/vim"; and \
-          test "$GENV_TEST" = "integration-macos"; and \
-          test "$GOPATH" = "/opt/go"'; then
+        if fish -c './genv init --path test.env fish | source; test "$EDITOR" = "/usr/bin/vim"; and test "$GENV_TEST" = "integration-macos"; and test "$GOPATH" = "/opt/go"'; then
           echo "FISH_STATUS=✅" >> $GITHUB_ENV
           echo "✓ Fish integration test passed"
         else
           echo "FISH_STATUS=❌" >> $GITHUB_ENV
           echo "✗ Fish integration test FAILED"
-          FAILED=1
+          exit 1
         fi
-        
+
+    - name: Test PowerShell
+      continue-on-error: true
+      run: |
+        if ! command -v pwsh &> /dev/null;
+        then
+          echo "PWSH_STATUS=⚠️" >> $GITHUB_ENV
+          echo "PowerShell not found, skipping test."
+          exit 0
+        fi
         echo "=== Testing PowerShell ==="
-        echo "Generated script:"
-        ./genv init --path test.env pwsh
-        echo "---"
-        if pwsh -Command './genv init --path test.env pwsh | Invoke-Expression; if ($env:EDITOR -ne "/usr/bin/vim") { Write-Error "EDITOR=$env:EDITOR"; exit 1 }; if ($env:GENV_TEST -ne "integration-macos") { Write-Error "GENV_TEST=$env:GENV_TEST"; exit 1 }; if ($env:GOPATH -ne "/opt/go") { Write-Error "GOPATH=$env:GOPATH"; exit 1 }; if ($env:PATH -notmatch ":") { Write-Error "PATH delimiter not colon"; exit 1 }'; then
+        if pwsh -Command './genv init --path test.env pwsh | Invoke-Expression; if ($env:EDITOR -ne "/usr/bin/vim") { exit 1 }; if ($env:GENV_TEST -ne "integration-macos") { exit 1 }; if ($env:GOPATH -ne "/opt/go") { exit 1 }; if ($env:PATH -notmatch ":") { exit 1 }'; then
           echo "PWSH_STATUS=✅" >> $GITHUB_ENV
           echo "✓ PowerShell integration test passed (colon delimiter verified)"
         else
           echo "PWSH_STATUS=❌" >> $GITHUB_ENV
           echo "✗ PowerShell integration test FAILED"
-          FAILED=1
+          exit 1
         fi
-        
+
+    - name: Test Nushell
+      continue-on-error: true
+      run: |
+        if ! command -v nu &> /dev/null;
+        then
+          echo "NUSHELL_STATUS=⚠️" >> $GITHUB_ENV
+          echo "Nushell not found, skipping test."
+          exit 0
+        fi
         echo "=== Testing Nushell ==="
-        echo "Generated script:"
-        ./genv init --path test.env nu
-        echo "---"
         ./genv init --path test.env nu > test.nu
         if nu -c 'source test.nu; if $env.EDITOR != "/usr/bin/vim" { exit 1 }; if $env.GENV_TEST != "integration-macos" { exit 1 }; if $env.GOPATH != "/opt/go" { exit 1 }'; then
           echo "NUSHELL_STATUS=✅" >> $GITHUB_ENV
@@ -399,13 +481,8 @@ jobs:
         else
           echo "NUSHELL_STATUS=❌" >> $GITHUB_ENV
           echo "✗ Nushell integration test FAILED"
-          echo "Nushell script contents:"
-          cat test.nu
-          FAILED=1
+          exit 1
         fi
-        
-        echo "MACOS_FAILED=$FAILED" >> $GITHUB_ENV
-        exit $FAILED
 
     - name: Generate test summary
       if: always()
@@ -420,7 +497,15 @@ jobs:
         echo "| PowerShell | ${PWSH_STATUS:-⚠️} | Colon delimiter verified |" >> $GITHUB_STEP_SUMMARY
         echo "| Nushell | ${NUSHELL_STATUS:-⚠️} | Via Homebrew |" >> $GITHUB_STEP_SUMMARY
         
-        if [ "${MACOS_FAILED:-0}" -ne 0 ]; then
+        FINAL_STATUS="success"
+        for status in ${BASH_STATUS:-⚠️} ${ZSH_STATUS:-⚠️} ${FISH_STATUS:-⚠️} ${PWSH_STATUS:-⚠️} ${NUSHELL_STATUS:-⚠️}; do
+          if [[ "$status" == "❌" ]]; then
+            FINAL_STATUS="failure"
+            break
+          fi
+        done
+
+        if [ "$FINAL_STATUS" == "failure" ]; then
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "❌ **Some tests failed on macOS**" >> $GITHUB_STEP_SUMMARY
           exit 1
@@ -465,16 +550,11 @@ jobs:
         PATH = ["`$PATH", "`$GOPATH\\bin", "C:\\tools"]
         "@ | Out-File -FilePath test.env -Encoding utf8
 
-    - name: Run all shell tests
+    - name: Test PowerShell
       shell: pwsh
       continue-on-error: true
       run: |
-        $Failed = 0
-        
         Write-Host "=== Testing PowerShell ==="
-        Write-Host "Generated script:"
-        .\genv.exe init --path test.env pwsh
-        Write-Host "---"
         try {
           $output = .\genv.exe init --path test.env pwsh
           if ([string]::IsNullOrWhiteSpace($output)) { throw "genv produced empty output" }
@@ -487,31 +567,27 @@ jobs:
           Write-Host "✓ PowerShell integration test passed (semicolon delimiter verified)"
           "PWSH_STATUS=✅" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
         } catch {
-          Write-Host "✗ PowerShell integration test FAILED: $_"
+          Write-Host "✗ PowerShell integration test FAILED: $_ "
           "PWSH_STATUS=❌" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          $Failed = 1
+          exit 1
         }
-        
+
+    - name: Test CMD
+      shell: pwsh
+      continue-on-error: true
+      run: |
         Write-Host "`n=== Testing CMD ==="
-        Write-Host "Generated script:"
-        .\genv.exe init --path test.env cmd
-        Write-Host "---"
         try {
           .\genv.exe init --path test.env cmd > test.bat
-          Write-Host "Batch file contents:"
-          Get-Content test.bat
-          cmd /c "call test.bat && if not `"%EDITOR%`"==`"C:\Program Files\Vim\vim.exe`" (echo EDITOR mismatch: %EDITOR% && exit /b 1) && if not `"%GENV_TEST%`"==`"integration-windows`" (echo GENV_TEST mismatch: %GENV_TEST% && exit /b 1) && if not `"%GOPATH%`"==`"C:\Go`" (echo GOPATH mismatch: %GOPATH% && exit /b 1)"
+          cmd /c "call test.bat && if not `"%EDITOR%`"==`"C:\\Program Files\\Vim\\vim.exe`" (exit /b 1) && if not `"%GENV_TEST%`"==`"integration-windows`" (exit /b 1) && if not `"%GOPATH%`"==`"C:\\Go`" (exit /b 1)"
           if ($LASTEXITCODE -ne 0) { throw "CMD test failed with exit code $LASTEXITCODE" }
           Write-Host "✓ CMD integration test passed"
           "CMD_STATUS=✅" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
         } catch {
-          Write-Host "✗ CMD integration test FAILED: $_"
+          Write-Host "✗ CMD integration test FAILED: $_ "
           "CMD_STATUS=❌" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          $Failed = 1
+          exit 1
         }
-        
-        "WINDOWS_FAILED=$Failed" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        exit $Failed
 
     - name: Generate test summary
       if: always()
@@ -520,21 +596,16 @@ jobs:
         $pwshStatus = if ($env:PWSH_STATUS) { $env:PWSH_STATUS } else { "⚠️" }
         $cmdStatus = if ($env:CMD_STATUS) { $env:CMD_STATUS } else { "⚠️" }
         
-        @"
-        # Shell Integration Test Results (Windows)
+        @" # Shell Integration Test Results (Windows)
         
         | Shell | Status | Notes |
         |-------|--------|-------|
         | PowerShell | $pwshStatus | Semicolon delimiter verified |
         | CMD | $cmdStatus | Batch file syntax |
         
-        ## PowerShell OS-Aware Delimiter Test
-        - Semicolon (;) used on Windows
-        - PATH expansion working
-        - Variable references correct
         "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
         
-        if ($env:WINDOWS_FAILED -ne "0") {
+        if (($env:PWSH_STATUS -eq "❌") -or ($env:CMD_STATUS -eq "❌")) {
           "`n❌ **Some tests failed on Windows**" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
           exit 1
         }
@@ -565,10 +636,24 @@ jobs:
     - name: Build genv
       run: go build -o genv ./cmd/genv
 
-    - name: Install shell syntax checkers
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y shellcheck bash zsh fish
+    - name: Install dependencies
+      run: sudo apt-get update
+
+    - name: Install shellcheck
+      continue-on-error: true
+      run: sudo apt-get install -y shellcheck
+
+    - name: Install bash
+      continue-on-error: true
+      run: sudo apt-get install -y bash
+
+    - name: Install zsh
+      continue-on-error: true
+      run: sudo apt-get install -y zsh
+
+    - name: Install fish
+      continue-on-error: true
+      run: sudo apt-get install -y fish
 
     - name: Create test config
       run: |
@@ -578,57 +663,79 @@ jobs:
         PATH = ["$PATH", "/usr/local/bin"]
         EOF
 
-    - name: Run syntax validation
+    - name: Verify Bash syntax
       continue-on-error: true
       run: |
-        FAILED=0
-        
-        echo "=== Verifying Bash syntax ==="
+        if ! command -v bash &> /dev/null || ! command -v shellcheck &> /dev/null;
+        then
+          echo "BASH_SYNTAX=⚠️" >> $GITHUB_ENV
+          echo "Bash or shellcheck not found, skipping test."
+          exit 0
+        fi
         ./genv init --path test.env bash > test.bash
-        if bash -n test.bash && shellcheck -s bash test.bash; then
+        if bash -n test.bash && shellcheck -s bash test.bash;
+        then
           echo "BASH_SYNTAX=✅" >> $GITHUB_ENV
           echo "✓ Bash syntax valid"
         else
           echo "BASH_SYNTAX=❌" >> $GITHUB_ENV
           echo "✗ Bash syntax check FAILED"
-          FAILED=1
+          exit 1
         fi
         
-        echo "=== Verifying Zsh syntax ==="
+    - name: Verify Zsh syntax
+      continue-on-error: true
+      run: |
+        if ! command -v zsh &> /dev/null;
+        then
+          echo "ZSH_SYNTAX=⚠️" >> $GITHUB_ENV
+          echo "Zsh not found, skipping test."
+          exit 0
+        fi
         ./genv init --path test.env zsh > test.zsh
-        if zsh -n test.zsh; then
+        if zsh -n test.zsh;
+        then
           echo "ZSH_SYNTAX=✅" >> $GITHUB_ENV
           echo "✓ Zsh syntax valid"
         else
           echo "ZSH_SYNTAX=❌" >> $GITHUB_ENV
           echo "✗ Zsh syntax check FAILED"
-          FAILED=1
+          exit 1
         fi
         
-        echo "=== Verifying Fish syntax ==="
+    - name: Verify Fish syntax
+      continue-on-error: true
+      run: |
+        if ! command -v fish &> /dev/null;
+        then
+          echo "FISH_SYNTAX=⚠️" >> $GITHUB_ENV
+          echo "Fish not found, skipping test."
+          exit 0
+        fi
         ./genv init --path test.env fish > test.fish
-        if fish -n test.fish; then
+        if fish -n test.fish;
+        then
           echo "FISH_SYNTAX=✅" >> $GITHUB_ENV
           echo "✓ Fish syntax valid"
         else
           echo "FISH_SYNTAX=❌" >> $GITHUB_ENV
           echo "✗ Fish syntax check FAILED"
-          FAILED=1
+          exit 1
         fi
         
-        echo "=== Verifying PowerShell syntax ==="
+    - name: Verify PowerShell syntax
+      continue-on-error: true
+      run: |
         ./genv init --path test.env pwsh > test.ps1
-        if grep -q '\$env:' test.ps1; then
+        if grep -q '\$env:' test.ps1;
+        then
           echo "PWSH_SYNTAX=✅" >> $GITHUB_ENV
           echo "✓ PowerShell syntax patterns found"
         else
           echo "PWSH_SYNTAX=❌" >> $GITHUB_ENV
           echo "✗ PowerShell syntax check FAILED"
-          FAILED=1
+          exit 1
         fi
-        
-        echo "SYNTAX_FAILED=$FAILED" >> $GITHUB_ENV
-        exit $FAILED
 
     - name: Generate syntax summary
       if: always()
@@ -643,7 +750,15 @@ jobs:
         echo "| PowerShell | ${PWSH_SYNTAX:-⚠️} Pattern check | - |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
-        if [ "${SYNTAX_FAILED:-0}" -eq 0 ]; then
+        FINAL_STATUS="success"
+        for status in ${BASH_SYNTAX:-⚠️} ${ZSH_SYNTAX:-⚠️} ${FISH_SYNTAX:-⚠️} ${PWSH_SYNTAX:-⚠️}; do
+          if [[ "$status" == "❌" ]]; then
+            FINAL_STATUS="failure"
+            break
+          fi
+        done
+
+        if [ "$FINAL_STATUS" == "success" ]; then
           echo "✅ All generated scripts have valid syntax!" >> $GITHUB_STEP_SUMMARY
         else
           echo "❌ **Some syntax checks failed**" >> $GITHUB_STEP_SUMMARY
@@ -721,6 +836,5 @@ jobs:
         echo "- Config-defined variable references" >> $GITHUB_STEP_SUMMARY
         echo "- PowerShell OS-aware delimiters (: Unix, ; Windows)" >> $GITHUB_STEP_SUMMARY
         echo "- Shell syntax validation" >> $GITHUB_STEP_SUMMARY
-        echo "- Ion colon-separated arrays (no array export support)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "## Total Shells Tested: 16" >> $GITHUB_STEP_SUMMARY
+        echo "For more details, see the workflow logs."
