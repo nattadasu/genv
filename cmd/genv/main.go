@@ -41,6 +41,7 @@ func handleInitCommand() {
 	initCmd := flag.NewFlagSet("init", flag.ExitOnError)
 	configPath := initCmd.String("path", "", "Path to custom config file (default: ~/.genv.env)")
 	showWarnings := initCmd.Bool("warnings", false, "Show warnings about variable references")
+	dedupePath := initCmd.Bool("dedupe-path", false, "Remove duplicate entries from PATH-like variables")
 	showHelp := initCmd.Bool("help", false, "Show help for init command")
 
 	if err := initCmd.Parse(os.Args[2:]); err != nil {
@@ -61,11 +62,11 @@ func handleInitCommand() {
 	}
 
 	shellName := initCmd.Arg(0)
-	handleInit(shellName, *configPath, *showWarnings)
+	handleInit(shellName, *configPath, *showWarnings, *dedupePath)
 }
 
-func handleInit(shellName, configPath string, showWarnings bool) {
-	script, err := generator.Generate(shellName, configPath, showWarnings)
+func handleInit(shellName, configPath string, showWarnings, dedupePath bool) {
+	script, err := generator.GenerateWithOptions(shellName, configPath, showWarnings, dedupePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
@@ -85,6 +86,7 @@ func printUsage() {
 	fmt.Println("Options for init:")
 	fmt.Println("  --path <file>      Path to custom config file (default: ~/.genv.env)")
 	fmt.Println("  --warnings         Show warnings about variable references")
+	fmt.Println("  --dedupe-path      Remove duplicate entries from PATH-like variables")
 	fmt.Println("  --help             Show detailed help for init command")
 	fmt.Println()
 	fmt.Println("Supported shells:")
@@ -115,11 +117,10 @@ func printInitHelp() {
 	fmt.Println("  --path <file>      Path to custom config file")
 	fmt.Println("                     Default: ~/.genv.env")
 	fmt.Println()
-	fmt.Println("  --warnings         Show warnings about potentially problematic")
-	fmt.Println("                     variable references:")
-	fmt.Println("                     - Recursive references (VAR references itself)")
-	fmt.Println("                     - String vars referencing array vars")
-	fmt.Println("                     (Does not apply to *PATH or *DIRS variables)")
+	fmt.Println("  --warnings         Show warnings about variable reference issues")
+	fmt.Println()
+	fmt.Println("  --dedupe-path      Remove duplicate PATH entries at runtime")
+	fmt.Println("                     Works with: bash, zsh, fish, pwsh, nu, xonsh")
 	fmt.Println()
 	fmt.Println("  --help             Show this help message")
 	fmt.Println()

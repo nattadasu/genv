@@ -10,6 +10,11 @@ import (
 
 // Generate creates shell-specific initialization script
 func Generate(shellName string, configPath string, showWarnings bool) (string, error) {
+	return GenerateWithOptions(shellName, configPath, showWarnings, false)
+}
+
+// GenerateWithOptions creates shell-specific initialization script with additional options
+func GenerateWithOptions(shellName string, configPath string, showWarnings bool, dedupePath bool) (string, error) {
 	// Parse the env file
 	var result *parser.ParseResult
 	var err error
@@ -43,6 +48,6 @@ func Generate(shellName string, configPath string, showWarnings bool) (string, e
 		}
 	}
 
-	// Generate the script
-	return shell.GenerateWithKeys(result.EnvVars, definedKeys), nil
+	// Generate the script with options
+	return shell.GenerateWithOptions(result.EnvVars, definedKeys, dedupePath), nil
 }

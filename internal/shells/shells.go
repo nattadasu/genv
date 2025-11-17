@@ -12,6 +12,7 @@ type Shell interface {
 	Name() string
 	Generate(vars []parser.EnvVar) string
 	GenerateWithKeys(vars []parser.EnvVar, definedKeys map[string]bool) string
+	GenerateWithOptions(vars []parser.EnvVar, definedKeys map[string]bool, dedupePath bool) string
 }
 
 // GetShell returns the appropriate shell implementation
