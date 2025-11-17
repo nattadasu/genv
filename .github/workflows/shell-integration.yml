@@ -11,6 +11,15 @@ jobs:
   test-shells-linux:
     name: Test Shells on Linux
     runs-on: ubuntu-latest
+    outputs:
+      bash_status: ${{ steps.set-outputs.outputs.bash_status }}
+      zsh_status: ${{ steps.set-outputs.outputs.zsh_status }}
+      ksh_status: ${{ steps.set-outputs.outputs.ksh_status }}
+      fish_status: ${{ steps.set-outputs.outputs.fish_status }}
+      tcsh_status: ${{ steps.set-outputs.outputs.tcsh_status }}
+      pwsh_status: ${{ steps.set-outputs.outputs.pwsh_status }}
+      nushell_status: ${{ steps.set-outputs.outputs.nushell_status }}
+      ion_status: ${{ steps.set-outputs.outputs.ion_status }}
     
     steps:
     - name: Checkout code
@@ -81,6 +90,9 @@ jobs:
         FAILED=0
         
         echo "=== Testing Bash ==="
+        echo "Generated script:"
+        ./genv init --path test.env bash
+        echo "---"
         if bash -c 'eval "$(./genv init --path test.env bash)" && \
           test "$EDITOR" = "/usr/bin/vim" && \
           test "$GENV_TEST" = "integration" && \
@@ -96,6 +108,9 @@ jobs:
         fi
         
         echo "=== Testing Zsh ==="
+        echo "Generated script:"
+        ./genv init --path test.env zsh
+        echo "---"
         if zsh -c 'eval "$(./genv init --path test.env zsh)" && \
           test "$EDITOR" = "/usr/bin/vim" && \
           test "$GENV_TEST" = "integration" && \
@@ -111,6 +126,9 @@ jobs:
         fi
         
         echo "=== Testing Ksh ==="
+        echo "Generated script:"
+        ./genv init --path test.env ksh
+        echo "---"
         if ksh -c 'eval "$(./genv init --path test.env ksh)" && \
           test "$EDITOR" = "/usr/bin/vim" && \
           test "$GENV_TEST" = "integration" && \
@@ -126,6 +144,9 @@ jobs:
         fi
         
         echo "=== Testing Fish ==="
+        echo "Generated script:"
+        ./genv init --path test.env fish
+        echo "---"
         if fish -c './genv init --path test.env fish | source; \
           test "$EDITOR" = "/usr/bin/vim"; and \
           test "$GENV_TEST" = "integration"; and \
@@ -141,7 +162,11 @@ jobs:
         fi
         
         echo "=== Testing Tcsh ==="
-        if tcsh -c 'eval "`./genv init --path test.env tcsh`" && \
+        echo "Generated script:"
+        ./genv init --path test.env tcsh
+        echo "---"
+        ./genv init --path test.env tcsh > test.tcsh
+        if tcsh -c 'source test.tcsh && \
           test "$EDITOR" = "/usr/bin/vim" && \
           test "$GENV_TEST" = "integration" && \
           test "$TEST_VALUE" = "hello-world" && \
@@ -151,11 +176,16 @@ jobs:
         else
           echo "TCSH_STATUS=❌" >> $GITHUB_ENV
           echo "✗ Tcsh integration test FAILED"
+          echo "Tcsh script contents:"
+          cat test.tcsh
           FAILED=1
         fi
         
         echo "=== Testing PowerShell ==="
-        if pwsh -Command './genv init --path test.env pwsh | Invoke-Expression; if ($env:EDITOR -ne "/usr/bin/vim") { exit 1 }; if ($env:GENV_TEST -ne "integration") { exit 1 }; if ($env:TEST_VALUE -ne "hello-world") { exit 1 }; if ($env:GOPATH -ne "/opt/go") { exit 1 }; if ($env:PATH -notmatch "/opt/go/bin") { exit 1 }'; then
+        echo "Generated script:"
+        ./genv init --path test.env pwsh
+        echo "---"
+        if pwsh -Command './genv init --path test.env pwsh | Invoke-Expression; if ($env:EDITOR -ne "/usr/bin/vim") { Write-Error "EDITOR=$env:EDITOR"; exit 1 }; if ($env:GENV_TEST -ne "integration") { Write-Error "GENV_TEST=$env:GENV_TEST"; exit 1 }; if ($env:TEST_VALUE -ne "hello-world") { Write-Error "TEST_VALUE=$env:TEST_VALUE"; exit 1 }; if ($env:GOPATH -ne "/opt/go") { Write-Error "GOPATH=$env:GOPATH"; exit 1 }; if ($env:PATH -notmatch "/opt/go/bin") { Write-Error "PATH=$env:PATH"; exit 1 }'; then
           echo "PWSH_STATUS=✅" >> $GITHUB_ENV
           echo "✓ PowerShell integration test passed"
         else
@@ -165,6 +195,9 @@ jobs:
         fi
         
         echo "=== Testing Nushell ==="
+        echo "Generated script:"
+        ./genv init --path test.env nu
+        echo "---"
         ./genv init --path test.env nu > test.nu
         if nu -c 'source test.nu; if $env.EDITOR != "/usr/bin/vim" { exit 1 }; if $env.GENV_TEST != "integration" { exit 1 }; if $env.TEST_VALUE != "hello-world" { exit 1 }; if $env.GOPATH != "/opt/go" { exit 1 }'; then
           echo "NUSHELL_STATUS=✅" >> $GITHUB_ENV
@@ -172,10 +205,15 @@ jobs:
         else
           echo "NUSHELL_STATUS=❌" >> $GITHUB_ENV
           echo "✗ Nushell integration test FAILED"
+          echo "Nushell script contents:"
+          cat test.nu
           FAILED=1
         fi
         
         echo "=== Testing Ion ==="
+        echo "Generated script:"
+        ./genv init --path test.env ion
+        echo "---"
         if ion -c 'eval "$(./genv init --path test.env ion)" && test "$EDITOR" = "/usr/bin/vim" && test "$GENV_TEST" = "integration" && test "$TEST_VALUE" = "hello-world" && test "$GOPATH" = "/opt/go" && echo "$PATH" | grep -q "/opt/go/bin"'; then
           echo "ION_STATUS=✅" >> $GITHUB_ENV
           echo "✓ Ion integration test passed"
@@ -214,10 +252,29 @@ jobs:
           echo "❌ **Some tests failed on Linux**" >> $GITHUB_STEP_SUMMARY
           exit 1
         fi
+    
+    - name: Set outputs
+      id: set-outputs
+      if: always()
+      run: |
+        echo "bash_status=${BASH_STATUS:-⚠️}" >> $GITHUB_OUTPUT
+        echo "zsh_status=${ZSH_STATUS:-⚠️}" >> $GITHUB_OUTPUT
+        echo "ksh_status=${KSH_STATUS:-⚠️}" >> $GITHUB_OUTPUT
+        echo "fish_status=${FISH_STATUS:-⚠️}" >> $GITHUB_OUTPUT
+        echo "tcsh_status=${TCSH_STATUS:-⚠️}" >> $GITHUB_OUTPUT
+        echo "pwsh_status=${PWSH_STATUS:-⚠️}" >> $GITHUB_OUTPUT
+        echo "nushell_status=${NUSHELL_STATUS:-⚠️}" >> $GITHUB_OUTPUT
+        echo "ion_status=${ION_STATUS:-⚠️}" >> $GITHUB_OUTPUT
 
   test-shells-macos:
     name: Test Shells on macOS
     runs-on: macos-latest
+    outputs:
+      bash_status: ${{ steps.set-outputs.outputs.bash_status }}
+      zsh_status: ${{ steps.set-outputs.outputs.zsh_status }}
+      fish_status: ${{ steps.set-outputs.outputs.fish_status }}
+      pwsh_status: ${{ steps.set-outputs.outputs.pwsh_status }}
+      nushell_status: ${{ steps.set-outputs.outputs.nushell_status }}
     
     steps:
     - name: Checkout code
@@ -251,6 +308,9 @@ jobs:
         FAILED=0
         
         echo "=== Testing Bash ==="
+        echo "Generated script:"
+        ./genv init --path test.env bash
+        echo "---"
         if bash -c 'eval "$(./genv init --path test.env bash)" && \
           test "$EDITOR" = "/usr/bin/vim" && \
           test "$GENV_TEST" = "integration-macos" && \
@@ -264,6 +324,9 @@ jobs:
         fi
         
         echo "=== Testing Zsh ==="
+        echo "Generated script:"
+        ./genv init --path test.env zsh
+        echo "---"
         if zsh -c 'eval "$(./genv init --path test.env zsh)" && \
           test "$EDITOR" = "/usr/bin/vim" && \
           test "$GENV_TEST" = "integration-macos" && \
@@ -277,6 +340,9 @@ jobs:
         fi
         
         echo "=== Testing Fish ==="
+        echo "Generated script:"
+        ./genv init --path test.env fish
+        echo "---"
         if fish -c './genv init --path test.env fish | source; \
           test "$EDITOR" = "/usr/bin/vim"; and \
           test "$GENV_TEST" = "integration-macos"; and \
@@ -290,7 +356,10 @@ jobs:
         fi
         
         echo "=== Testing PowerShell ==="
-        if pwsh -Command './genv init --path test.env pwsh | Invoke-Expression; if ($env:EDITOR -ne "/usr/bin/vim") { exit 1 }; if ($env:GENV_TEST -ne "integration-macos") { exit 1 }; if ($env:GOPATH -ne "/opt/go") { exit 1 }; if ($env:PATH -notmatch ":") { exit 1 }'; then
+        echo "Generated script:"
+        ./genv init --path test.env pwsh
+        echo "---"
+        if pwsh -Command './genv init --path test.env pwsh | Invoke-Expression; if ($env:EDITOR -ne "/usr/bin/vim") { Write-Error "EDITOR=$env:EDITOR"; exit 1 }; if ($env:GENV_TEST -ne "integration-macos") { Write-Error "GENV_TEST=$env:GENV_TEST"; exit 1 }; if ($env:GOPATH -ne "/opt/go") { Write-Error "GOPATH=$env:GOPATH"; exit 1 }; if ($env:PATH -notmatch ":") { Write-Error "PATH delimiter not colon"; exit 1 }'; then
           echo "PWSH_STATUS=✅" >> $GITHUB_ENV
           echo "✓ PowerShell integration test passed (colon delimiter verified)"
         else
@@ -300,6 +369,9 @@ jobs:
         fi
         
         echo "=== Testing Nushell ==="
+        echo "Generated script:"
+        ./genv init --path test.env nu
+        echo "---"
         ./genv init --path test.env nu > test.nu
         if nu -c 'source test.nu; if $env.EDITOR != "/usr/bin/vim" { exit 1 }; if $env.GENV_TEST != "integration-macos" { exit 1 }; if $env.GOPATH != "/opt/go" { exit 1 }'; then
           echo "NUSHELL_STATUS=✅" >> $GITHUB_ENV
@@ -307,6 +379,8 @@ jobs:
         else
           echo "NUSHELL_STATUS=❌" >> $GITHUB_ENV
           echo "✗ Nushell integration test FAILED"
+          echo "Nushell script contents:"
+          cat test.nu
           FAILED=1
         fi
         
@@ -331,10 +405,23 @@ jobs:
           echo "❌ **Some tests failed on macOS**" >> $GITHUB_STEP_SUMMARY
           exit 1
         fi
+    
+    - name: Set outputs
+      id: set-outputs
+      if: always()
+      run: |
+        echo "bash_status=${BASH_STATUS:-⚠️}" >> $GITHUB_OUTPUT
+        echo "zsh_status=${ZSH_STATUS:-⚠️}" >> $GITHUB_OUTPUT
+        echo "fish_status=${FISH_STATUS:-⚠️}" >> $GITHUB_OUTPUT
+        echo "pwsh_status=${PWSH_STATUS:-⚠️}" >> $GITHUB_OUTPUT
+        echo "nushell_status=${NUSHELL_STATUS:-⚠️}" >> $GITHUB_OUTPUT
 
   test-shells-windows:
     name: Test Shells on Windows
     runs-on: windows-latest
+    outputs:
+      pwsh_status: ${{ steps.set-outputs.outputs.pwsh_status }}
+      cmd_status: ${{ steps.set-outputs.outputs.cmd_status }}
     
     steps:
     - name: Checkout code
@@ -365,11 +452,16 @@ jobs:
         $Failed = 0
         
         Write-Host "=== Testing PowerShell ==="
+        Write-Host "Generated script:"
+        .\genv.exe init --path test.env pwsh
+        Write-Host "---"
         try {
-          .\genv.exe init --path test.env pwsh | Invoke-Expression
-          if ($env:EDITOR -ne "C:\Program Files\Vim\vim.exe") { throw "EDITOR mismatch" }
-          if ($env:GENV_TEST -ne "integration-windows") { throw "GENV_TEST mismatch" }
-          if ($env:GOPATH -ne "C:\Go") { throw "GOPATH mismatch" }
+          $output = .\genv.exe init --path test.env pwsh
+          if ([string]::IsNullOrWhiteSpace($output)) { throw "genv produced empty output" }
+          Invoke-Expression $output
+          if ($env:EDITOR -ne "C:\Program Files\Vim\vim.exe") { throw "EDITOR mismatch: $env:EDITOR" }
+          if ($env:GENV_TEST -ne "integration-windows") { throw "GENV_TEST mismatch: $env:GENV_TEST" }
+          if ($env:GOPATH -ne "C:\Go") { throw "GOPATH mismatch: $env:GOPATH" }
           if ($env:PATH -notmatch ";") { throw "PATH should use semicolon on Windows" }
           if ($env:PATH -notmatch "C:\\Go\\bin") { throw "PATH should contain GOPATH\bin" }
           Write-Host "✓ PowerShell integration test passed (semicolon delimiter verified)"
@@ -381,10 +473,15 @@ jobs:
         }
         
         Write-Host "`n=== Testing CMD ==="
+        Write-Host "Generated script:"
+        .\genv.exe init --path test.env cmd
+        Write-Host "---"
         try {
           .\genv.exe init --path test.env cmd > test.bat
-          cmd /c "call test.bat && if not `"%EDITOR%`"==`"C:\Program Files\Vim\vim.exe`" exit /b 1 && if not `"%GENV_TEST%`"==`"integration-windows`" exit /b 1 && if not `"%GOPATH%`"==`"C:\Go`" exit /b 1"
-          if ($LASTEXITCODE -ne 0) { throw "CMD test failed" }
+          Write-Host "Batch file contents:"
+          Get-Content test.bat
+          cmd /c "call test.bat && if not `"%EDITOR%`"==`"C:\Program Files\Vim\vim.exe`" (echo EDITOR mismatch: %EDITOR% && exit /b 1) && if not `"%GENV_TEST%`"==`"integration-windows`" (echo GENV_TEST mismatch: %GENV_TEST% && exit /b 1) && if not `"%GOPATH%`"==`"C:\Go`" (echo GOPATH mismatch: %GOPATH% && exit /b 1)"
+          if ($LASTEXITCODE -ne 0) { throw "CMD test failed with exit code $LASTEXITCODE" }
           Write-Host "✓ CMD integration test passed"
           "CMD_STATUS=✅" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
         } catch {
@@ -421,6 +518,16 @@ jobs:
           "`n❌ **Some tests failed on Windows**" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
           exit 1
         }
+    
+    - name: Set outputs
+      id: set-outputs
+      if: always()
+      shell: pwsh
+      run: |
+        $pwshStatus = if ($env:PWSH_STATUS) { $env:PWSH_STATUS } else { "⚠️" }
+        $cmdStatus = if ($env:CMD_STATUS) { $env:CMD_STATUS } else { "⚠️" }
+        "pwsh_status=$pwshStatus" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+        "cmd_status=$cmdStatus" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
   syntax-verification:
     name: Verify Shell Syntax
@@ -543,6 +650,49 @@ jobs:
         echo "| Windows | ${{ needs.test-shells-windows.result == 'success' && '✅' || '❌' }} | PowerShell, CMD |" >> $GITHUB_STEP_SUMMARY
         echo "| Syntax | ${{ needs.syntax-verification.result == 'success' && '✅' || '❌' }} | Bash, Zsh, Fish, PowerShell |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Show detailed shell status if any platform failed
+        if [ "${{ needs.test-shells-linux.result }}" != "success" ] || [ "${{ needs.test-shells-macos.result }}" != "success" ] || [ "${{ needs.test-shells-windows.result }}" != "success" ]; then
+          echo "## Detailed Shell Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.test-shells-linux.result }}" != "success" ]; then
+            echo "### Linux" >> $GITHUB_STEP_SUMMARY
+            echo "| Shell | Status |" >> $GITHUB_STEP_SUMMARY
+            echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Bash | ${{ needs.test-shells-linux.outputs.bash_status }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Zsh | ${{ needs.test-shells-linux.outputs.zsh_status }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Ksh | ${{ needs.test-shells-linux.outputs.ksh_status }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Fish | ${{ needs.test-shells-linux.outputs.fish_status }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Tcsh | ${{ needs.test-shells-linux.outputs.tcsh_status }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| PowerShell | ${{ needs.test-shells-linux.outputs.pwsh_status }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Nushell | ${{ needs.test-shells-linux.outputs.nushell_status }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Ion | ${{ needs.test-shells-linux.outputs.ion_status }} |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.test-shells-macos.result }}" != "success" ]; then
+            echo "### macOS" >> $GITHUB_STEP_SUMMARY
+            echo "| Shell | Status |" >> $GITHUB_STEP_SUMMARY
+            echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Bash | ${{ needs.test-shells-macos.outputs.bash_status }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Zsh | ${{ needs.test-shells-macos.outputs.zsh_status }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Fish | ${{ needs.test-shells-macos.outputs.fish_status }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| PowerShell | ${{ needs.test-shells-macos.outputs.pwsh_status }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Nushell | ${{ needs.test-shells-macos.outputs.nushell_status }} |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.test-shells-windows.result }}" != "success" ]; then
+            echo "### Windows" >> $GITHUB_STEP_SUMMARY
+            echo "| Shell | Status |" >> $GITHUB_STEP_SUMMARY
+            echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+            echo "| PowerShell | ${{ needs.test-shells-windows.outputs.pwsh_status }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| CMD | ${{ needs.test-shells-windows.outputs.cmd_status }} |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+        fi
+        
         echo "## Key Verifications" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "- Variable assignment and retrieval" >> $GITHUB_STEP_SUMMARY
