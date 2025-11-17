@@ -26,17 +26,16 @@ func (s *CmdShell) Generate(vars []parser.EnvVar) string {
 			var processedValues []string
 			for _, val := range envVar.Values {
 				expanded := parser.ExpandEnvVar(val, envVar.Key)
-				// Check if this is a self-reference
-				if expanded == "$"+envVar.Key {
-					processedValues = append(processedValues, "%"+envVar.Key+"%")
-				} else {
-					processedValues = append(processedValues, expanded)
-				}
+				// Convert any remaining $VAR references to %VAR%
+				expanded = convertDollarToPercent(expanded)
+				processedValues = append(processedValues, expanded)
 			}
 			value := strings.Join(processedValues, ";")
 			sb.WriteString(fmt.Sprintf("set \"%s=%s\"\n", envVar.Key, value))
 		} else {
 			expanded := parser.ExpandEnvVar(envVar.Values[0], envVar.Key)
+			// Convert any remaining $VAR references to %VAR%
+			expanded = convertDollarToPercent(expanded)
 			sb.WriteString(fmt.Sprintf("set \"%s=%s\"\n", envVar.Key, expanded))
 		}
 	}
@@ -46,4 +45,30 @@ func (s *CmdShell) Generate(vars []parser.EnvVar) string {
 
 func (s *CmdShell) GenerateWithKeys(vars []parser.EnvVar, definedKeys map[string]bool) string {
 	return s.Generate(vars)
+}
+
+// convertDollarToPercent converts $VAR to %VAR% for CMD syntax
+func convertDollarToPercent(s string) string {
+	// Replace $KEY pattern with %KEY%
+	result := ""
+	i := 0
+	for i < len(s) {
+		if s[i] == '$' && i+1 < len(s) {
+			// Found a $, extract the variable name
+			j := i + 1
+			for j < len(s) && (s[j] >= 'A' && s[j] <= 'Z' || s[j] >= 'a' && s[j] <= 'z' || s[j] >= '0' && s[j] <= '9' || s[j] == '_') {
+				j++
+			}
+			if j > i+1 {
+				// Found a variable name
+				varName := s[i+1 : j]
+				result += "%" + varName + "%"
+				i = j
+				continue
+			}
+		}
+		result += string(s[i])
+		i++
+	}
+	return result
 }
