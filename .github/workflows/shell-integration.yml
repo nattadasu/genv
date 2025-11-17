@@ -44,9 +44,10 @@ jobs:
 
     - name: Install Ion shell
       run: |
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-        source $HOME/.cargo/env
-        cargo install ion-shell
+        git clone https://gitlab.redox-os.org/redox-os/ion/
+        cd ion
+        cargo build --release
+        sudo cp target/release/ion /usr/local/bin/
         ion --version
 
     - name: Create test config
@@ -139,12 +140,7 @@ jobs:
         fi
         
         echo "=== Testing PowerShell ==="
-        if pwsh -Command './genv init --path test.env pwsh | Invoke-Expression; \
-          if ($env:EDITOR -ne "/usr/bin/vim") { exit 1 }; \
-          if ($env:GENV_TEST -ne "integration") { exit 1 }; \
-          if ($env:TEST_VALUE -ne "hello-world") { exit 1 }; \
-          if ($env:GOPATH -ne "/opt/go") { exit 1 }; \
-          if ($env:PATH -notmatch "/opt/go/bin") { exit 1 }'; then
+        if pwsh -Command './genv init --path test.env pwsh | Invoke-Expression; if ($env:EDITOR -ne "/usr/bin/vim") { exit 1 }; if ($env:GENV_TEST -ne "integration") { exit 1 }; if ($env:TEST_VALUE -ne "hello-world") { exit 1 }; if ($env:GOPATH -ne "/opt/go") { exit 1 }; if ($env:PATH -notmatch "/opt/go/bin") { exit 1 }'; then
           echo "PWSH_STATUS=✅" >> $GITHUB_ENV
           echo "✓ PowerShell integration test passed"
         else
@@ -155,11 +151,7 @@ jobs:
         
         echo "=== Testing Nushell ==="
         ./genv init --path test.env nu > test.nu
-        if nu -c 'source test.nu; \
-          if $env.EDITOR != "/usr/bin/vim" { exit 1 }; \
-          if $env.GENV_TEST != "integration" { exit 1 }; \
-          if $env.TEST_VALUE != "hello-world" { exit 1 }; \
-          if $env.GOPATH != "/opt/go" { exit 1 }'; then
+        if nu -c 'source test.nu; if $env.EDITOR != "/usr/bin/vim" { exit 1 }; if $env.GENV_TEST != "integration" { exit 1 }; if $env.TEST_VALUE != "hello-world" { exit 1 }; if $env.GOPATH != "/opt/go" { exit 1 }'; then
           echo "NUSHELL_STATUS=✅" >> $GITHUB_ENV
           echo "✓ Nushell integration test passed"
         else
@@ -169,13 +161,7 @@ jobs:
         fi
         
         echo "=== Testing Ion ==="
-        source $HOME/.cargo/env
-        if ion -c 'eval "$(./genv init --path test.env ion)" && \
-          test "$EDITOR" = "/usr/bin/vim" && \
-          test "$GENV_TEST" = "integration" && \
-          test "$TEST_VALUE" = "hello-world" && \
-          test "$GOPATH" = "/opt/go" && \
-          echo "$PATH" | grep -q "/opt/go/bin"'; then
+        if ion -c 'eval "$(./genv init --path test.env ion)" && test "$EDITOR" = "/usr/bin/vim" && test "$GENV_TEST" = "integration" && test "$TEST_VALUE" = "hello-world" && test "$GOPATH" = "/opt/go" && echo "$PATH" | grep -q "/opt/go/bin"'; then
           echo "ION_STATUS=✅" >> $GITHUB_ENV
           echo "✓ Ion integration test passed"
         else
@@ -289,11 +275,7 @@ jobs:
         fi
         
         echo "=== Testing PowerShell ==="
-        if pwsh -Command './genv init --path test.env pwsh | Invoke-Expression; \
-          if ($env:EDITOR -ne "/usr/bin/vim") { exit 1 }; \
-          if ($env:GENV_TEST -ne "integration-macos") { exit 1 }; \
-          if ($env:GOPATH -ne "/opt/go") { exit 1 }; \
-          if ($env:PATH -notmatch ":") { exit 1 }'; then
+        if pwsh -Command './genv init --path test.env pwsh | Invoke-Expression; if ($env:EDITOR -ne "/usr/bin/vim") { exit 1 }; if ($env:GENV_TEST -ne "integration-macos") { exit 1 }; if ($env:GOPATH -ne "/opt/go") { exit 1 }; if ($env:PATH -notmatch ":") { exit 1 }'; then
           echo "PWSH_STATUS=✅" >> $GITHUB_ENV
           echo "✓ PowerShell integration test passed (colon delimiter verified)"
         else
@@ -304,10 +286,7 @@ jobs:
         
         echo "=== Testing Nushell ==="
         ./genv init --path test.env nu > test.nu
-        if nu -c 'source test.nu; \
-          if $env.EDITOR != "/usr/bin/vim" { exit 1 }; \
-          if $env.GENV_TEST != "integration-macos" { exit 1 }; \
-          if $env.GOPATH != "/opt/go" { exit 1 }'; then
+        if nu -c 'source test.nu; if $env.EDITOR != "/usr/bin/vim" { exit 1 }; if $env.GENV_TEST != "integration-macos" { exit 1 }; if $env.GOPATH != "/opt/go" { exit 1 }'; then
           echo "NUSHELL_STATUS=✅" >> $GITHUB_ENV
           echo "✓ Nushell integration test passed"
         else
