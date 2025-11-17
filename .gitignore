@@ -37,3 +37,4 @@ Thumbs.db
 # Local config files (for testing)
 .genv.env.local
 test.env
+coverage.txt
