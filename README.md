@@ -1,4 +1,4 @@
-# genv - Global Environment Variable Loader
+# genv
 
 [![CI](https://github.com/nattadasu/genv/actions/workflows/ci.yml/badge.svg)](https://github.com/nattadasu/genv/actions/workflows/ci.yml)
 [![Shell Integration](https://github.com/nattadasu/genv/actions/workflows/shell-integration.yml/badge.svg)](https://github.com/nattadasu/genv/actions/workflows/shell-integration.yml)
@@ -6,17 +6,18 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/nattadasu/genv)](https://goreportcard.com/report/github.com/nattadasu/genv)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A cross-platform, shell-agnostic tool that loads environment variables from a global TOML configuration file and generates shell-specific initialization scripts.
+**A fricking damn simple and fast user-scope global environment variables loader for most shells**
+
+Write your environment variables once, use them everywhere.
 
 ## Features
 
-- 🚀 **Universal Shell Support**: Works with 14+ shells including Bash, Zsh, Fish, PowerShell, Nushell, and more
-- 📝 **TOML Configuration**: Clean, readable configuration format
-- 🔄 **Variable Expansion**: Dynamic insertion of existing environment variables
-- 🎯 **Shell-Specific Output**: Generates proper syntax for each shell
-- 🌍 **Cross-Platform**: Runs on Linux, macOS, and Windows
-- ⚡ **Fast & Lightweight**: Single binary with no dependencies
-- 🔧 **Smart Delimiters**: OS-aware path separators (`:` on Unix, `;` on Windows)
+- 🚀 **14+ Shells**: Bash, Zsh, Fish, PowerShell, Nushell, Xonsh, and more
+- 📝 **Simple TOML Config**: Easy to read and write
+- 🔄 **Variable References**: Use `$PATH`, `$HOME`, etc. in your config
+- 🧹 **PATH Deduplication**: Remove duplicate paths automatically
+- 🌍 **Cross-Platform**: Linux, macOS, and Windows
+- ⚡ **Single Binary**: No dependencies to install
 
 ## Supported Shells
 
@@ -52,192 +53,235 @@ go install ./cmd/genv
 
 Download pre-built binaries for your platform from the [releases page](https://github.com/nattadasu/genv/releases).
 
-## Usage
+## Quick Start
 
-### 1. Create Configuration File
+### 1. Create Config File
 
-Create a file at `~/.genv.env` with your environment variables in TOML format:
+Create `~/.genv.env`:
 
 ```toml
-EDITOR = "/usr/bin/micro"
-HELLO = "World!"
-MY_CUSTOM_VAR = "some value"
+# Simple variables
+EDITOR = "vim"
+MY_API_KEY = "secret123"
 
-# Array values for PATH-like variables
+# PATH with existing value
 PATH = [
-    "$PATH",           # Reference existing PATH
+    "$PATH",              # Keep current PATH
     "/usr/local/bin",
-    "~/.local/bin"
+    "$HOME/.local/bin"
 ]
 
-# Variables can reference other env vars
-PROJECT_DIR = "$HOME/projects"
+# Reference other variables
+GOPATH = "$HOME/go"
 ```
 
-### 2. Generate Shell Initialization Script
+### 2. Load Into Your Shell
 
+Pick your shell and add this to its config file on top of config file:
+
+### Bash / Zsh
+
+Add to `~/.bashrc` or `~/.zshrc`:
 ```bash
-# Generate for your current shell
-genv init bash    # For Bash
-genv init zsh     # For Zsh
-genv init fish    # For Fish
-genv init pwsh    # For PowerShell
+eval "$(genv init bash)"  # or 'zsh'
 ```
 
-### 3. Load Variables into Your Shell
+### Fish
 
-#### Option 1: Eval in Shell Config (Recommended)
-
-Add to your shell configuration file:
-
-**Bash** (`~/.bashrc` or `~/.bash_profile`):
-```bash
-eval "$(genv init bash)"
-```
-
-**Zsh** (`~/.zshrc`):
-```zsh
-eval "$(genv init zsh)"
-```
-
-**Fish** (`~/.config/fish/config.fish`):
+Add to `~/.config/fish/config.fish`:
 ```fish
 genv init fish | source
 ```
 
-**PowerShell** (`$PROFILE`) - Works on Linux, macOS, and Windows:
+### PowerShell
+
+Add to your PowerShell profile (`$PROFILE`):
 ```powershell
-Invoke-Expression (genv init powershell | Out-String)
-# Or use the shorter alias:
 Invoke-Expression (genv init pwsh | Out-String)
 ```
 
-**Nushell** (`~/.config/nushell/env.nu`):
-```nushell
-genv init nushell | save -f ~/.config/nushell/genv.nu
-source ~/.config/nushell/genv.nu
+To find your profile location:
+```powershell
+echo $PROFILE
 ```
 
-#### Option 2: Save to File and Source
+### nushell
 
+Add to `~/.config/nushell/config.nu`:
+```nu
+genv init nu | save -f ~/.config/nushell/genv.nu
+use ~/.config/nushell/genv.nu
+```
+
+### xonsh
+
+Add to `~/.xonshrc`:
+```python
+execx($(genv init xonsh))
+```
+
+### Other Shells
+
+<details>
+<summary>Click to expand</summary>
+
+**ksh/ash** - Add to `~/.kshrc`:
 ```bash
-# Generate and save
-genv init bash > ~/.genv_init.sh
-
-# Add to your ~/.bashrc
-source ~/.genv_init.sh
+eval "$(genv init ksh)"
 ```
 
-## Configuration Format
+**tcsh/csh** - Add to `~/.tcshrc`:
+```csh
+eval `genv init tcsh`
+```
 
-### Simple Variables
+**ion** - Add to `~/.config/ion/initrc`:
+```ion
+eval $(genv init ion)
+```
+
+**rc** - Add to `~/.rcrc`:
+```rc
+eval `{genv init rc}
+```
+
+**CMD (Windows)** - Create `genv-init.bat`:
+```batch
+genv init cmd > %USERPROFILE%\genv-init.bat
+call %USERPROFILE%\genv-init.bat
+```
+
+</details>
+
+## Configuration Guide
+
+### Basic Variables
 
 ```toml
-EDITOR = "/usr/bin/vim"
+EDITOR = "vim"
 NAME = "John Doe"
+API_KEY = "secret"
 ```
 
-### Array Variables
+### PATH Variables
 
-Arrays are automatically joined with the appropriate delimiter for each shell:
-- **POSIX shells** (bash, zsh, etc.): colon (`:`)
-- **Fish**: space (` `)
-- **PowerShell**: OS-aware (`:` on Linux/macOS, `;` on Windows)
-- **CMD (Windows)**: semicolon (`;`)
-- **Nushell**: list syntax with spread operator
-- **Xonsh**: Python list with spread operator
-- **Ion**: colon-separated strings (no array export support)
+Use arrays for PATH-like variables. They'll be joined with the right separator for each shell (`:` on Unix, `;` on Windows):
 
 ```toml
-PATH = ["$PATH", "/usr/local/bin", "~/.local/bin"]
+PATH = [
+    "$PATH",              # Keep existing PATH
+    "/usr/local/bin",
+    "$HOME/.local/bin"
+]
+
 LD_LIBRARY_PATH = ["$LD_LIBRARY_PATH", "/usr/local/lib"]
 ```
 
-### Variable Expansion
+### Variable References
 
-Reference existing environment variables using `$VAR_NAME`:
+Reference other environment variables with `$NAME`:
 
 ```toml
-HOME_BIN = "$HOME/bin"
-PROJECT = "$HOME/projects/myapp"
+# Simple reference
+PROJECT_DIR = "$HOME/projects"
 
-# Self-reference to prepend/append to existing variables
-PATH = [
-    "/opt/custom/bin",    # Prepend
-    "$PATH",              # Current PATH
-    "$HOME/.local/bin"    # Append
-]
+# Reference config-defined variables
+GOPATH = "$HOME/go"
+PATH = ["$PATH", "$GOPATH/bin"]  # $GOPATH defined above
+
+# Tilde expansion
+CONFIG_DIR = "~/.config/myapp"
 ```
 
-Variables that don't exist are left as-is.
+## Advanced Options
 
-## PowerShell Cross-Platform Support
+### Remove Duplicate Paths
 
-PowerShell Core (pwsh) is fully supported on Linux, macOS, and Windows with automatic OS detection:
-
-- **Linux/macOS**: Uses colon (`:`) as path separator
-- **Windows**: Uses semicolon (`;`) as path separator
-- **Self-references**: Uses `${env:VAR}` syntax (e.g., `${env:PATH}`)
-- **Config variables**: Assumes variables defined in config are available (no escaping)
-
-Example on Linux:
-```powershell
-$env:GOPATH = "/home/user/go"
-$env:PATH = "${env:PATH}:$GOPATH/bin"  # Colon separator
-```
-
-Example on Windows:
-```powershell
-$env:GOPATH = "C:\Users\user\go"
-$env:PATH = "${env:PATH};$GOPATH\bin"  # Semicolon separator
-```
-
-## Shell-Specific Examples
-
-<details>
-<summary><b>Bash/Zsh Output</b></summary>
+If your PATH has duplicates:
 
 ```bash
-export EDITOR="/usr/bin/vim"
-export PATH="$PATH:/usr/local/bin:~/.local/bin"
-```
-</details>
-
-<details>
-<summary><b>Fish Output</b></summary>
-
-```fish
-set -gx EDITOR "/usr/bin/vim"
-set -gx PATH $PATH /usr/local/bin ~/.local/bin
-```
-</details>
-
-<details>
-<summary><b>PowerShell Output (Cross-Platform)</b></summary>
-
-**On Linux/macOS:**
-```powershell
-$env:EDITOR = "/usr/bin/vim"
-$env:PATH = "${env:PATH}:/usr/local/bin:~/.local/bin"
+eval "$(genv init --dedupe-path bash)"
 ```
 
-**On Windows:**
-```powershell
-$env:EDITOR = "C:\Program Files\Vim\vim.exe"
-$env:PATH = "${env:PATH};C:\bin;C:\Users\user\.local\bin"
+Works with: bash, zsh, fish, pwsh, nu, xonsh
+
+### Alphabetical Sorting
+
+Sort variables alphabetically (PATH stays at the end):
+
+```bash
+eval "$(genv init --sort bash)"
 ```
 
-Note: Uses colon (`:`) on Unix-like systems, semicolon (`;`) on Windows.
-</details>
+> ![WARNING]
+>
+> May cause issues if variables depend on each other's order.
 
-<details>
-<summary><b>Nushell Output</b></summary>
+### Show Warnings
 
-```nushell
-$env.EDITOR = "/usr/bin/vim"
-$env.PATH = [...$env.PATH, "/usr/local/bin", "~/.local/bin"]
+Check for potential issues:
+
+```bash
+genv init --warnings bash
 ```
-</details>
+
+## Command Reference
+
+```bash
+genv init <shell>              # Generate init script
+genv init --path FILE <shell>  # Use custom config file  
+genv init --dedupe-path <shell> # Remove duplicate PATH entries
+genv init --sort <shell>       # Sort variables alphabetically
+genv init --warnings <shell>   # Show configuration warnings
+genv version                   # Show version
+genv help                      # Show help
+```
+
+### Examples
+
+```bash
+# Basic usage
+genv init bash
+
+# Custom config file
+genv init --path ~/work/.env zsh
+
+# Remove duplicate paths
+genv init --dedupe-path fish
+
+# Combine options
+genv init --path custom.env --dedupe-path --warnings bash
+```
+
+## Shell-Specific Notes
+
+### PowerShell
+
+Works on Linux, macOS, and Windows. Automatically uses the right path separator:
+- Linux/macOS: `("path1", "path2") -join ':'`
+- Windows: `("path1", "path2") -join ';'`
+
+Variable references become `${env:NAME}` syntax.
+
+### Nushell
+
+Variables like `$GOPATH` in your config become `$env.GOPATH` in Nushell.
+Arrays use native list syntax: `[...$env.PATH, "/new/path"]`
+
+### Fish
+
+Arrays are space-separated. Self-references like `$PATH` work natively.
+
+### Xonsh
+
+Python-style lists with proper `$VARIABLE` references.
+
+### Limited Support
+
+- **Csh/Tcsh**: PATH deduplication not available
+- **Ion**: Limited array support  
+- **Rc**: Limited string manipulation
+- **CMD**: Basic variable setting only
 
 ## Development
 
@@ -283,38 +327,6 @@ task build-all
 task build-linux
 task build-macos
 task build-windows
-```
-
-## Project Structure
-
-```
-genv/
-├── cmd/
-│   └── genv/
-│       └── main.go           # CLI entry point
-├── internal/
-│   ├── parser/
-│   │   ├── parser.go         # TOML parsing logic
-│   │   └── parser_test.go
-│   ├── generator/
-│   │   ├── generator.go      # Script generation
-│   │   └── generator_test.go
-│   └── shells/
-│       ├── shells.go         # Shell interface
-│       ├── posix.go          # POSIX shells
-│       ├── fish.go           # Fish shell
-│       ├── powershell.go     # PowerShell
-│       ├── nushell.go        # Nushell
-│       ├── xonsh.go          # Xonsh
-│       ├── csh.go            # C shells
-│       ├── cmd.go            # Windows CMD
-│       ├── ion.go            # Ion shell
-│       ├── rc.go             # rc shell
-│       └── shells_test.go
-├── Taskfile.yml              # Task automation
-├── go.mod
-├── go.sum
-└── README.md
 ```
 
 ## How It Works
@@ -385,4 +397,4 @@ task test-coverage  # Generate coverage report
 
 - Built with [Go](https://golang.org/)
 - TOML parsing by [BurntSushi/toml](https://github.com/BurntSushi/toml)
-- Task automation by [Taskfile](https://taskfile.dev/)
+- Task automation by [Taskfile](https://taskfile.dev/)s
