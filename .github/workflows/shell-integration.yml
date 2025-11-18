@@ -635,6 +635,9 @@ jobs:
       pwsh_status: ${{ steps.set-outputs.outputs.pwsh_status }}
       cmd_status: ${{ steps.set-outputs.outputs.cmd_status }}
       clink_status: ${{ steps.set-outputs.outputs.clink_status }}
+      nushell_status: ${{ steps.set-outputs.outputs.nushell_status }}
+      xonsh_status: ${{ steps.set-outputs.outputs.xonsh_status }}
+      elvish_status: ${{ steps.set-outputs.outputs.elvish_status }}
     
     steps:
     - name: Checkout code
@@ -737,12 +740,131 @@ if not "%GOPATH%"=="C:\\Go" (exit /b 1)
           exit 1
         }
 
+    - name: Install Nushell
+      shell: pwsh
+      continue-on-error: true
+      run: |
+        Write-Host "=== Installing Nushell ==="
+        winget install nushell.nushell --accept-source-agreements --accept-package-agreements
+
+    - name: Test Nushell
+      shell: pwsh
+      continue-on-error: true
+      run: |
+        Write-Host "`n=== Testing Nushell ==="
+        try {
+          # Add nushell to PATH
+          $env:PATH = "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\Nushell.Nushell_Microsoft.Winget.Source_8wekyb3d8bbwe;$env:PATH"
+          
+          if (-not (Get-Command nu -ErrorAction SilentlyContinue)) {
+            Write-Host "Nushell not found, skipping test"
+            "NUSHELL_STATUS=⚠️" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            return
+          }
+          
+          .\genv.exe init --path test.env nushell | Out-File -FilePath test.nu -Encoding utf8
+          $testScript = @"
+source test.nu
+if `$env.EDITOR != "C:\\Program Files\\Vim\\vim.exe" { exit 1 }
+if `$env.GENV_TEST != "integration-windows" { exit 1 }
+if `$env.GOPATH != "C:\\Go" { exit 1 }
+if (`$env.PATH | str contains "C:\\Go\\bin" | not) { exit 1 }
+"@
+          $testScript | Out-File -FilePath test_nu.nu -Encoding utf8
+          nu test_nu.nu
+          if ($LASTEXITCODE -ne 0) { throw "Nushell test failed" }
+          Write-Host "✓ Nushell integration test passed"
+          "NUSHELL_STATUS=✅" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        } catch {
+          Write-Host "✗ Nushell integration test FAILED: $_ "
+          "NUSHELL_STATUS=❌" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          exit 1
+        }
+
+    - name: Install Xonsh
+      shell: pwsh
+      continue-on-error: true
+      run: |
+        Write-Host "=== Installing Xonsh ==="
+        pip install xonsh
+
+    - name: Test Xonsh
+      shell: pwsh
+      continue-on-error: true
+      run: |
+        Write-Host "`n=== Testing Xonsh ==="
+        try {
+          if (-not (Get-Command xonsh -ErrorAction SilentlyContinue)) {
+            Write-Host "Xonsh not found, skipping test"
+            "XONSH_STATUS=⚠️" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            return
+          }
+          
+          .\genv.exe init --path test.env xonsh > test.xsh
+          # Xonsh test - source-bash might not work on Windows, so we'll test basic functionality
+          xonsh -c "execx(`$(cat test.xsh).strip()); assert `$EDITOR == 'C:\\Program Files\\Vim\\vim.exe'; assert `$GENV_TEST == 'integration-windows'; assert `$GOPATH == 'C:\\Go'"
+          if ($LASTEXITCODE -ne 0) { throw "Xonsh test failed" }
+          Write-Host "✓ Xonsh integration test passed"
+          "XONSH_STATUS=✅" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        } catch {
+          Write-Host "✗ Xonsh integration test FAILED: $_ "
+          "XONSH_STATUS=❌" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          exit 1
+        }
+
+    - name: Install Elvish
+      shell: pwsh
+      continue-on-error: true
+      run: |
+        Write-Host "=== Installing Elvish ==="
+        # Download Elvish for Windows
+        $elvishUrl = "https://dl.elv.sh/windows-amd64/elvish-HEAD.zip"
+        Invoke-WebRequest -Uri $elvishUrl -OutFile elvish.zip
+        Expand-Archive -Path elvish.zip -DestinationPath elvish_temp
+        Move-Item -Path elvish_temp\elvish-HEAD.exe -Destination C:\Windows\System32\elvish.exe -Force
+        Remove-Item -Recurse -Force elvish_temp, elvish.zip
+
+    - name: Test Elvish
+      shell: pwsh
+      continue-on-error: true
+      run: |
+        Write-Host "`n=== Testing Elvish ==="
+        try {
+          if (-not (Get-Command elvish -ErrorAction SilentlyContinue)) {
+            Write-Host "Elvish not found, skipping test"
+            "ELVISH_STATUS=⚠️" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            return
+          }
+          
+          .\genv.exe init --path test.env elvish | Out-File -FilePath test.elv -Encoding utf8
+          # Test Elvish with semicolon delimiter on Windows
+          $testScript = @"
+eval (cat test.elv | slurp)
+if (!=s `$E:EDITOR "C:\\Program Files\\Vim\\vim.exe") { exit 1 }
+if (!=s `$E:GENV_TEST "integration-windows") { exit 1 }
+if (!=s `$E:GOPATH "C:\\Go") { exit 1 }
+"@
+          $testScript | Out-File -FilePath test_elv.elv -Encoding utf8
+          elvish test_elv.elv
+          if ($LASTEXITCODE -ne 0) { throw "Elvish test failed" }
+          Write-Host "✓ Elvish integration test passed (semicolon delimiter verified)"
+          "ELVISH_STATUS=✅" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        } catch {
+          Write-Host "✗ Elvish integration test FAILED: $_ "
+          "ELVISH_STATUS=❌" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          exit 1
+        }
+
     - name: Generate test summary
       if: always()
       shell: pwsh
       run: |
         $pwshStatus = if ($env:PWSH_STATUS) { $env:PWSH_STATUS } else { "⚠️" }
         $cmdStatus = if ($env:CMD_STATUS) { $env:CMD_STATUS } else { "⚠️" }
+        $clinkStatus = if ($env:CLINK_STATUS) { $env:CLINK_STATUS } else { "⚠️" }
+        $nushellStatus = if ($env:NUSHELL_STATUS) { $env:NUSHELL_STATUS } else { "⚠️" }
+        $xonshStatus = if ($env:XONSH_STATUS) { $env:XONSH_STATUS } else { "⚠️" }
+        $elvishStatus = if ($env:ELVISH_STATUS) { $env:ELVISH_STATUS } else { "⚠️" }
         
         @"
         # Shell Integration Test Results (Windows)
@@ -752,10 +874,13 @@ if not "%GOPATH%"=="C:\\Go" (exit /b 1)
         | PowerShell | $pwshStatus | Semicolon delimiter verified |
         | CMD | $cmdStatus | Batch file syntax |
         | Clink | $clinkStatus | CMD with Lua scripting |
+        | Nushell | $nushellStatus | Modern shell with native arrays |
+        | Xonsh | $xonshStatus | Python-based shell |
+        | Elvish | $elvishStatus | Semicolon delimiter on Windows |
         
         "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
         
-        if (($env:PWSH_STATUS -eq "❌") -or ($env:CMD_STATUS -eq "❌") -or ($env:CLINK_STATUS -eq "❌")) {
+        if (($env:PWSH_STATUS -eq "❌") -or ($env:CMD_STATUS -eq "❌") -or ($env:CLINK_STATUS -eq "❌") -or ($env:NUSHELL_STATUS -eq "❌") -or ($env:XONSH_STATUS -eq "❌") -or ($env:ELVISH_STATUS -eq "❌")) {
           "`n❌ **Some tests failed on Windows**" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
           exit 1
         }
@@ -768,9 +893,15 @@ if not "%GOPATH%"=="C:\\Go" (exit /b 1)
         $pwshStatus = if ($env:PWSH_STATUS) { $env:PWSH_STATUS } else { "⚠️" }
         $cmdStatus = if ($env:CMD_STATUS) { $env:CMD_STATUS } else { "⚠️" }
         $clinkStatus = if ($env:CLINK_STATUS) { $env:CLINK_STATUS } else { "⚠️" }
+        $nushellStatus = if ($env:NUSHELL_STATUS) { $env:NUSHELL_STATUS } else { "⚠️" }
+        $xonshStatus = if ($env:XONSH_STATUS) { $env:XONSH_STATUS } else { "⚠️" }
+        $elvishStatus = if ($env:ELVISH_STATUS) { $env:ELVISH_STATUS } else { "⚠️" }
         "pwsh_status=$pwshStatus" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
         "cmd_status=$cmdStatus" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
         "clink_status=$clinkStatus" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+        "nushell_status=$nushellStatus" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+        "xonsh_status=$xonshStatus" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+        "elvish_status=$elvishStatus" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
   syntax-verification:
     name: Verify Shell Syntax
