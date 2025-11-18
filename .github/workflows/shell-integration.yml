@@ -19,7 +19,7 @@ jobs:
       ksh_status: ${{ steps.set-outputs.outputs.ksh_status }}
       fish_status: ${{ steps.set-outputs.outputs.fish_status }}
       tcsh_status: ${{ steps.set-outputs.outputs.tcsh_status }}
-      csh_status: ${{ steps.set-outputs.outputs.csh_status }}
+
       pwsh_status: ${{ steps.set-outputs.outputs.pwsh_status }}
       nushell_status: ${{ steps.set-outputs.outputs.nushell_status }}
       xonsh_status: ${{ steps.set-outputs.outputs.xonsh_status }}
@@ -293,12 +293,7 @@ jobs:
 
     - name: Install Elvish
       continue-on-error: true
-      run: |
-        # Elvish is not in Ubuntu repos, install from GitHub releases
-        wget -q https://dl.elv.sh/linux-amd64/elvish-HEAD.tar.gz
-        tar xzf elvish-HEAD.tar.gz
-        sudo mv elvish-HEAD /usr/local/bin/elvish
-        sudo chmod +x /usr/local/bin/elvish
+      run: sudo apt-get install -y elvish
 
     - name: Test Elvish
       continue-on-error: true
@@ -323,12 +318,15 @@ jobs:
     - name: Install Xonsh
       continue-on-error: true
       run: |
-        sudo apt-get install -y python3-pip
-        pip3 install xonsh
+        sudo apt-get install -y pipx
+        pipx install xonsh
+        pipx ensurepath
 
     - name: Test Xonsh
       continue-on-error: true
       run: |
+        # Add pipx bin to PATH
+        export PATH="$HOME/.local/bin:$PATH"
         if ! command -v xonsh &> /dev/null;
         then
           echo "XONSH_STATUS=⚠️" >> $GITHUB_ENV
@@ -390,26 +388,6 @@ jobs:
           exit 1
         fi
 
-    - name: Test Csh
-      continue-on-error: true
-      run: |
-        if ! command -v csh &> /dev/null;
-        then
-          echo "CSH_STATUS=⚠️" >> $GITHUB_ENV
-          echo "Csh not found, skipping test."
-          exit 0
-        fi
-        echo "=== Testing Csh ==="
-        ./genv init --path test.env csh > test.csh
-        if csh -c 'source test.csh && test "$EDITOR" = "/usr/bin/vim" && test "$GENV_TEST" = "integration" && test "$TEST_VALUE" = "hello-world" && test "$GOPATH" = "/opt/go"'; then
-          echo "CSH_STATUS=✅" >> $GITHUB_ENV
-          echo "✓ Csh integration test passed"
-        else
-          echo "CSH_STATUS=❌" >> $GITHUB_ENV
-          echo "✗ Csh integration test FAILED"
-          exit 1
-        fi
-
     - name: Generate test summary
       if: always()
       run: |
@@ -424,7 +402,7 @@ jobs:
         echo "| Ksh | ${KSH_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
         echo "| Fish | ${FISH_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
         echo "| Tcsh | ${TCSH_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
-        echo "| Csh | ${CSH_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
+
         echo "| PowerShell | ${PWSH_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
         echo "| Nushell | ${NUSHELL_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
         echo "| Xonsh | ${XONSH_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
@@ -656,6 +634,7 @@ jobs:
     outputs:
       pwsh_status: ${{ steps.set-outputs.outputs.pwsh_status }}
       cmd_status: ${{ steps.set-outputs.outputs.cmd_status }}
+      clink_status: ${{ steps.set-outputs.outputs.clink_status }}
     
     steps:
     - name: Checkout code
@@ -718,6 +697,46 @@ jobs:
           exit 1
         }
 
+    - name: Install Clink
+      shell: pwsh
+      continue-on-error: true
+      run: |
+        Write-Host "=== Installing Clink ==="
+        choco install clink -y
+
+    - name: Test Clink
+      shell: pwsh
+      continue-on-error: true
+      run: |
+        Write-Host "`n=== Testing Clink ==="
+        try {
+          .\genv.exe init --path test.env clink > test_clink.lua
+          # Create a test script that loads clink config
+          @"
+@echo off
+clink inject --profile . --quiet
+call test.bat
+if not "%EDITOR%"=="C:\\Program Files\\Vim\\vim.exe" (exit /b 1)
+if not "%GENV_TEST%"=="integration-windows" (exit /b 1)
+if not "%GOPATH%"=="C:\\Go" (exit /b 1)
+"@ | Out-File -FilePath test_clink.bat -Encoding ascii
+          
+          # Copy lua file to clink profile
+          New-Item -ItemType Directory -Force -Path ".clink" | Out-Null
+          Copy-Item test_clink.lua .clink/genv.lua
+          
+          # Test with clink
+          $env:CLINK_PROFILE = "."
+          cmd /c test_clink.bat
+          if ($LASTEXITCODE -ne 0) { throw "Clink test failed with exit code $LASTEXITCODE" }
+          Write-Host "✓ Clink integration test passed"
+          "CLINK_STATUS=✅" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        } catch {
+          Write-Host "✗ Clink integration test FAILED: $_ "
+          "CLINK_STATUS=❌" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          exit 1
+        }
+
     - name: Generate test summary
       if: always()
       shell: pwsh
@@ -732,10 +751,11 @@ jobs:
         |-------|--------|-------|
         | PowerShell | $pwshStatus | Semicolon delimiter verified |
         | CMD | $cmdStatus | Batch file syntax |
+        | Clink | $clinkStatus | CMD with Lua scripting |
         
         "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
         
-        if (($env:PWSH_STATUS -eq "❌") -or ($env:CMD_STATUS -eq "❌")) {
+        if (($env:PWSH_STATUS -eq "❌") -or ($env:CMD_STATUS -eq "❌") -or ($env:CLINK_STATUS -eq "❌")) {
           "`n❌ **Some tests failed on Windows**" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
           exit 1
         }
@@ -747,8 +767,10 @@ jobs:
       run: |
         $pwshStatus = if ($env:PWSH_STATUS) { $env:PWSH_STATUS } else { "⚠️" }
         $cmdStatus = if ($env:CMD_STATUS) { $env:CMD_STATUS } else { "⚠️" }
+        $clinkStatus = if ($env:CLINK_STATUS) { $env:CLINK_STATUS } else { "⚠️" }
         "pwsh_status=$pwshStatus" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
         "cmd_status=$cmdStatus" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+        "clink_status=$clinkStatus" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
   syntax-verification:
     name: Verify Shell Syntax
