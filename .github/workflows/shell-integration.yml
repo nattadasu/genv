@@ -204,7 +204,7 @@ jobs:
         fi
         echo "=== Testing Tcsh ==="
         ./genv init --path test.env tcsh > test.tcsh
-        if tcsh -c 'source test.tcsh && test "$EDITOR" = "/usr/bin/vim" && test "$GENV_TEST" = "integration" && test "$TEST_VALUE" = "hello-world" && test "$GOPATH" = "/opt/go"'; then
+        if tcsh -c 'source test.tcsh; if ("$EDITOR" != "/usr/bin/vim") exit 1; if ("$GENV_TEST" != "integration") exit 1; if ("$TEST_VALUE" != "hello-world") exit 1; if ("$GOPATH" != "/opt/go") exit 1'; then
           echo "TCSH_STATUS=✅" >> $GITHUB_ENV
           echo "✓ Tcsh integration test passed"
         else
@@ -223,7 +223,15 @@ jobs:
           exit 0
         fi
         echo "=== Testing PowerShell ==="
-        if pwsh -Command './genv init --path test.env pwsh | Invoke-Expression; if ($env:EDITOR -ne "/usr/bin/vim") { exit 1 }; if ($env:GENV_TEST -ne "integration") { exit 1 }; if ($env:TEST_VALUE -ne "hello-world") { exit 1 }; if ($env:GOPATH -ne "/opt/go") { exit 1 }; if ($env:PATH -notmatch "/opt/go/bin") { exit 1 }'; then
+        ./genv init --path test.env pwsh > test.ps1
+        cat >> test.ps1 << 'EOF'
+        if ($env:EDITOR -ne "/usr/bin/vim") { Write-Error "EDITOR mismatch"; exit 1 }
+        if ($env:GENV_TEST -ne "integration") { Write-Error "GENV_TEST mismatch"; exit 1 }
+        if ($env:TEST_VALUE -ne "hello-world") { Write-Error "TEST_VALUE mismatch"; exit 1 }
+        if ($env:GOPATH -ne "/opt/go") { Write-Error "GOPATH mismatch"; exit 1 }
+        if ($env:PATH -notmatch "/opt/go/bin") { Write-Error "PATH missing GOPATH/bin"; exit 1 }
+        EOF
+        if pwsh -File test.ps1; then
           echo "PWSH_STATUS=✅" >> $GITHUB_ENV
           echo "✓ PowerShell integration test passed"
         else
@@ -416,7 +424,7 @@ jobs:
         echo '```' >> $GITHUB_STEP_SUMMARY
         
         FINAL_STATUS="success"
-        for status in ${BASH_STATUS:-⚠️} ${ZSH_STATUS:-⚠️} ${KSH_STATUS:-⚠️} ${FISH_STATUS:-⚠️} ${TCSH_STATUS:-⚠️} ${PWSH_STATUS:-⚠️} ${NUSHELL_STATUS:-⚠️} ${ION_STATUS:-⚠️} ${RC_STATUS:-⚠️}; do
+        for status in ${BASH_STATUS:-⚠️} ${SH_STATUS:-⚠️} ${ASH_STATUS:-⚠️} ${ZSH_STATUS:-⚠️} ${KSH_STATUS:-⚠️} ${FISH_STATUS:-⚠️} ${TCSH_STATUS:-⚠️} ${PWSH_STATUS:-⚠️} ${NUSHELL_STATUS:-⚠️} ${XONSH_STATUS:-⚠️} ${ELVISH_STATUS:-⚠️} ${ION_STATUS:-⚠️} ${RC_STATUS:-⚠️}; do
           if [[ "$status" == "❌" ]]; then
             FINAL_STATUS="failure"
             break
@@ -562,7 +570,14 @@ jobs:
           exit 0
         fi
         echo "=== Testing PowerShell ==="
-        if pwsh -Command './genv init --path test.env pwsh | Invoke-Expression; if ($env:EDITOR -ne "/usr/bin/vim") { exit 1 }; if ($env:GENV_TEST -ne "integration-macos") { exit 1 }; if ($env:GOPATH -ne "/opt/go") { exit 1 }; if ($env:PATH -notmatch ":") { exit 1 }'; then
+        ./genv init --path test.env pwsh > test.ps1
+        cat >> test.ps1 << 'EOF'
+        if ($env:EDITOR -ne "/usr/bin/vim") { Write-Error "EDITOR mismatch"; exit 1 }
+        if ($env:GENV_TEST -ne "integration-macos") { Write-Error "GENV_TEST mismatch"; exit 1 }
+        if ($env:GOPATH -ne "/opt/go") { Write-Error "GOPATH mismatch"; exit 1 }
+        if ($env:PATH -notmatch ":") { Write-Error "PATH should use colon on macOS"; exit 1 }
+        EOF
+        if pwsh -File test.ps1; then
           echo "PWSH_STATUS=✅" >> $GITHUB_ENV
           echo "✓ PowerShell integration test passed (colon delimiter verified)"
         else
@@ -653,13 +668,13 @@ jobs:
 
     - name: Create test config
       run: |
-        @"
+        @'
         EDITOR = "C:\\Program Files\\Vim\\vim.exe"
         GENV_TEST = "integration-windows"
         TEST_VALUE = "hello-windows"
         GOPATH = "C:\\Go"
-        PATH = ["`$PATH", "`$GOPATH\\bin", "C:\\tools"]
-        "@ | Out-File -FilePath test.env -Encoding utf8
+        PATH = ["$PATH", "$GOPATH\\bin", "C:\\tools"]
+        '@ | Out-File -FilePath test.env -Encoding utf8
 
     - name: Test PowerShell
       shell: pwsh
@@ -667,9 +682,8 @@ jobs:
       run: |
         Write-Host "=== Testing PowerShell ==="
         try {
-          $output = .\genv.exe init --path test.env pwsh
-          if ([string]::IsNullOrWhiteSpace($output)) { throw "genv produced empty output" }
-          Invoke-Expression $output
+          .\genv.exe init --path test.env pwsh | Out-File -FilePath test.ps1 -Encoding utf8
+          . .\test.ps1
           if ($env:EDITOR -ne "C:\Program Files\Vim\vim.exe") { throw "EDITOR mismatch: ${env:EDITOR}" }
           if ($env:GENV_TEST -ne "integration-windows") { throw "GENV_TEST mismatch: ${env:GENV_TEST}" }
           if ($env:GOPATH -ne "C:\Go") { throw "GOPATH mismatch: ${env:GOPATH}" }
@@ -800,8 +814,15 @@ jobs:
           }
           
           .\genv.exe init --path test.env xonsh > test.xsh
-          # Xonsh test - source-bash might not work on Windows, so we'll test basic functionality
-          xonsh -c "execx(`$(cat test.xsh).strip()); assert `$EDITOR == 'C:\\Program Files\\Vim\\vim.exe'; assert `$GENV_TEST == 'integration-windows'; assert `$GOPATH == 'C:\\Go'"
+          # Xonsh test - use Python to validate environment variables
+          # Note: Xonsh on Windows has issues with PATH arrays, so we skip PATH validation
+          "import os" | Out-File -FilePath test_xonsh.py -Encoding utf8
+          "with open('test.xsh', 'r') as f:" | Out-File -FilePath test_xonsh.py -Encoding utf8 -Append
+          "    exec(f.read())" | Out-File -FilePath test_xonsh.py -Encoding utf8 -Append
+          "assert os.environ['EDITOR'] == r'C:\Program Files\Vim\vim.exe'" | Out-File -FilePath test_xonsh.py -Encoding utf8 -Append
+          "assert os.environ['GENV_TEST'] == 'integration-windows'" | Out-File -FilePath test_xonsh.py -Encoding utf8 -Append
+          "assert os.environ['GOPATH'] == r'C:\Go'" | Out-File -FilePath test_xonsh.py -Encoding utf8 -Append
+          python test_xonsh.py
           if ($LASTEXITCODE -ne 0) { throw "Xonsh test failed" }
           Write-Host "✓ Xonsh integration test passed"
           "XONSH_STATUS=✅" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -819,9 +840,12 @@ jobs:
         # Download Elvish for Windows
         $elvishUrl = "https://dl.elv.sh/windows-amd64/elvish-HEAD.zip"
         Invoke-WebRequest -Uri $elvishUrl -OutFile elvish.zip
-        Expand-Archive -Path elvish.zip -DestinationPath elvish_temp
-        Move-Item -Path elvish_temp\elvish-HEAD.exe -Destination C:\Windows\System32\elvish.exe -Force
-        Remove-Item -Recurse -Force elvish_temp, elvish.zip
+        Expand-Archive -Path elvish.zip -DestinationPath elvish_temp -Force
+        # Elvish binary is named elvish.exe
+        if (Test-Path "elvish_temp\elvish.exe") {
+          Move-Item -Path "elvish_temp\elvish.exe" -Destination "C:\Windows\System32\elvish.exe" -Force
+        }
+        Remove-Item -Recurse -Force elvish_temp, elvish.zip -ErrorAction SilentlyContinue
 
     - name: Test Elvish
       shell: pwsh
@@ -837,12 +861,10 @@ jobs:
           
           .\genv.exe init --path test.env elvish | Out-File -FilePath test.elv -Encoding utf8
           # Test Elvish with semicolon delimiter on Windows
-          @"
-          eval (cat test.elv | slurp)
-          if (!=s `$E:EDITOR "C:\\Program Files\\Vim\\vim.exe") { exit 1 }
-          if (!=s `$E:GENV_TEST "integration-windows") { exit 1 }
-          if (!=s `$E:GOPATH "C:\\Go") { exit 1 }
-          "@ | Out-File -FilePath test_elv.elv -Encoding utf8
+          "eval (cat test.elv | slurp)" | Out-File -FilePath test_elv.elv -Encoding utf8
+          "if (!=s `$E:EDITOR `"C:\\Program Files\\Vim\\vim.exe`") { exit 1 }" | Out-File -FilePath test_elv.elv -Encoding utf8 -Append
+          "if (!=s `$E:GENV_TEST `"integration-windows`") { exit 1 }" | Out-File -FilePath test_elv.elv -Encoding utf8 -Append
+          "if (!=s `$E:GOPATH `"C:\\Go`") { exit 1 }" | Out-File -FilePath test_elv.elv -Encoding utf8 -Append
           elvish test_elv.elv
           if ($LASTEXITCODE -ne 0) { throw "Elvish test failed" }
           Write-Host "✓ Elvish integration test passed (semicolon delimiter verified)"
