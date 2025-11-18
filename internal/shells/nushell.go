@@ -133,15 +133,43 @@ func (s *NushellShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map
 		sb.WriteString("\n")
 	}
 
+	// Build a map of array variables for reference detection
+	arrayVars := make(map[string]bool)
+	for _, v := range vars {
+		if v.IsArray {
+			arrayVars[v.Key] = true
+		}
+	}
+
 	for _, envVar := range vars {
 		if envVar.IsArray {
 			// Nushell uses list syntax
 			var processedValues []string
 			for _, val := range envVar.Values {
-				expanded := parser.ExpandEnvVar(val, envVar.Key)
+				var expanded string
+				if definedKeys != nil {
+					expanded = parser.ExpandEnvVarWithDefined(val, envVar.Key, definedKeys)
+				} else {
+					expanded = parser.ExpandEnvVar(val, envVar.Key)
+				}
 				// Check if this is a self-reference
 				if expanded == "$"+envVar.Key {
 					processedValues = append(processedValues, "...$env."+envVar.Key)
+				} else if strings.HasPrefix(expanded, "$") && !strings.Contains(expanded, "/") {
+					// Check if this is a reference to another array variable
+					refVar := strings.TrimPrefix(expanded, "$")
+					if arrayVars[refVar] {
+						// Use spread operator for array references
+						processedValues = append(processedValues, "...$env."+refVar)
+					} else {
+						// Single variable reference - use interpolation
+						escaped := escapeNushellString(expanded)
+						if strings.Contains(escaped, "$env.") {
+							processedValues = append(processedValues, fmt.Sprintf("$\"%s\"", convertToNushellInterpolation(escaped)))
+						} else {
+							processedValues = append(processedValues, fmt.Sprintf("\"%s\"", escaped))
+						}
+					}
 				} else {
 					escaped := escapeNushellString(expanded)
 					// If the string contains $env. references, use interpolated string syntax
@@ -160,7 +188,12 @@ func (s *NushellShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map
 				sb.WriteString(fmt.Sprintf("$env.%s = (__genv_dedupe_path $env.%s)\n", envVar.Key, envVar.Key))
 			}
 		} else {
-			expanded := parser.ExpandEnvVar(envVar.Values[0], envVar.Key)
+			var expanded string
+			if definedKeys != nil {
+				expanded = parser.ExpandEnvVarWithDefined(envVar.Values[0], envVar.Key, definedKeys)
+			} else {
+				expanded = parser.ExpandEnvVar(envVar.Values[0], envVar.Key)
+			}
 			escaped := escapeNushellString(expanded)
 			// If the string contains $env. references, use interpolated string syntax
 			if strings.Contains(escaped, "$env.") {
