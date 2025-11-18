@@ -13,12 +13,17 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       bash_status: ${{ steps.set-outputs.outputs.bash_status }}
+      sh_status: ${{ steps.set-outputs.outputs.sh_status }}
+      ash_status: ${{ steps.set-outputs.outputs.ash_status }}
       zsh_status: ${{ steps.set-outputs.outputs.zsh_status }}
       ksh_status: ${{ steps.set-outputs.outputs.ksh_status }}
       fish_status: ${{ steps.set-outputs.outputs.fish_status }}
       tcsh_status: ${{ steps.set-outputs.outputs.tcsh_status }}
+      csh_status: ${{ steps.set-outputs.outputs.csh_status }}
       pwsh_status: ${{ steps.set-outputs.outputs.pwsh_status }}
       nushell_status: ${{ steps.set-outputs.outputs.nushell_status }}
+      xonsh_status: ${{ steps.set-outputs.outputs.xonsh_status }}
+      elvish_status: ${{ steps.set-outputs.outputs.elvish_status }}
       ion_status: ${{ steps.set-outputs.outputs.ion_status }}
       rc_status: ${{ steps.set-outputs.outputs.rc_status }}
     
@@ -286,6 +291,125 @@ jobs:
           exit 1
         fi
 
+    - name: Install Elvish
+      continue-on-error: true
+      run: |
+        # Elvish is not in Ubuntu repos, install from GitHub releases
+        wget -q https://dl.elv.sh/linux-amd64/elvish-HEAD.tar.gz
+        tar xzf elvish-HEAD.tar.gz
+        sudo mv elvish-HEAD /usr/local/bin/elvish
+        sudo chmod +x /usr/local/bin/elvish
+
+    - name: Test Elvish
+      continue-on-error: true
+      run: |
+        if ! command -v elvish &> /dev/null;
+        then
+          echo "ELVISH_STATUS=⚠️" >> $GITHUB_ENV
+          echo "Elvish not found, skipping test."
+          exit 0
+        fi
+        echo "=== Testing Elvish ==="
+        ./genv init --path test.env elvish > test.elv
+        if elvish -c 'eval (cat test.elv | slurp); test $E:EDITOR = "/usr/bin/vim"; and test $E:GENV_TEST = "integration"; and test $E:TEST_VALUE = "hello-world"; and test $E:GOPATH = "/opt/go"'; then
+          echo "ELVISH_STATUS=✅" >> $GITHUB_ENV
+          echo "✓ Elvish integration test passed"
+        else
+          echo "ELVISH_STATUS=❌" >> $GITHUB_ENV
+          echo "✗ Elvish integration test FAILED"
+          exit 1
+        fi
+
+    - name: Install Xonsh
+      continue-on-error: true
+      run: |
+        sudo apt-get install -y python3-pip
+        pip3 install xonsh
+
+    - name: Test Xonsh
+      continue-on-error: true
+      run: |
+        if ! command -v xonsh &> /dev/null;
+        then
+          echo "XONSH_STATUS=⚠️" >> $GITHUB_ENV
+          echo "Xonsh not found, skipping test."
+          exit 0
+        fi
+        echo "=== Testing Xonsh ==="
+        ./genv init --path test.env xonsh > test.xsh
+        if xonsh -c 'source-bash test.xsh; test $EDITOR = "/usr/bin/vim" and $GENV_TEST = "integration" and $TEST_VALUE = "hello-world" and $GOPATH = "/opt/go"'; then
+          echo "XONSH_STATUS=✅" >> $GITHUB_ENV
+          echo "✓ Xonsh integration test passed"
+        else
+          echo "XONSH_STATUS=❌" >> $GITHUB_ENV
+          echo "✗ Xonsh integration test FAILED"
+          exit 1
+        fi
+
+    - name: Test Sh
+      continue-on-error: true
+      run: |
+        if ! command -v sh &> /dev/null;
+        then
+          echo "SH_STATUS=⚠️" >> $GITHUB_ENV
+          echo "Sh not found, skipping test."
+          exit 0
+        fi
+        echo "=== Testing Sh (POSIX) ==="
+        if sh -c 'eval "$(./genv init --path test.env sh)" && test "$EDITOR" = "/usr/bin/vim" && test "$GENV_TEST" = "integration" && test "$TEST_VALUE" = "hello-world" && test "$GOPATH" = "/opt/go"'; then
+          echo "SH_STATUS=✅" >> $GITHUB_ENV
+          echo "✓ Sh integration test passed"
+        else
+          echo "SH_STATUS=❌" >> $GITHUB_ENV
+          echo "✗ Sh integration test FAILED"
+          exit 1
+        fi
+
+    - name: Install Ash (BusyBox)
+      continue-on-error: true
+      run: |
+        sudo apt-get install -y busybox
+        sudo ln -sf /usr/bin/busybox /usr/local/bin/ash || true
+
+    - name: Test Ash
+      continue-on-error: true
+      run: |
+        if ! command -v ash &> /dev/null;
+        then
+          echo "ASH_STATUS=⚠️" >> $GITHUB_ENV
+          echo "Ash not found, skipping test."
+          exit 0
+        fi
+        echo "=== Testing Ash ==="
+        if ash -c 'eval "$(./genv init --path test.env ash)" && test "$EDITOR" = "/usr/bin/vim" && test "$GENV_TEST" = "integration" && test "$TEST_VALUE" = "hello-world" && test "$GOPATH" = "/opt/go"'; then
+          echo "ASH_STATUS=✅" >> $GITHUB_ENV
+          echo "✓ Ash integration test passed"
+        else
+          echo "ASH_STATUS=❌" >> $GITHUB_ENV
+          echo "✗ Ash integration test FAILED"
+          exit 1
+        fi
+
+    - name: Test Csh
+      continue-on-error: true
+      run: |
+        if ! command -v csh &> /dev/null;
+        then
+          echo "CSH_STATUS=⚠️" >> $GITHUB_ENV
+          echo "Csh not found, skipping test."
+          exit 0
+        fi
+        echo "=== Testing Csh ==="
+        ./genv init --path test.env csh > test.csh
+        if csh -c 'source test.csh && test "$EDITOR" = "/usr/bin/vim" && test "$GENV_TEST" = "integration" && test "$TEST_VALUE" = "hello-world" && test "$GOPATH" = "/opt/go"'; then
+          echo "CSH_STATUS=✅" >> $GITHUB_ENV
+          echo "✓ Csh integration test passed"
+        else
+          echo "CSH_STATUS=❌" >> $GITHUB_ENV
+          echo "✗ Csh integration test FAILED"
+          exit 1
+        fi
+
     - name: Generate test summary
       if: always()
       run: |
@@ -294,12 +418,17 @@ jobs:
         echo "| Shell | Status |" >> $GITHUB_STEP_SUMMARY
         echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
         echo "| Bash | ${BASH_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Sh | ${SH_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Ash | ${ASH_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
         echo "| Zsh | ${ZSH_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
         echo "| Ksh | ${KSH_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
         echo "| Fish | ${FISH_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
         echo "| Tcsh | ${TCSH_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Csh | ${CSH_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
         echo "| PowerShell | ${PWSH_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
         echo "| Nushell | ${NUSHELL_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Xonsh | ${XONSH_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Elvish | ${ELVISH_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
         echo "| Ion | ${ION_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
         echo "| Rc | ${RC_STATUS:-⚠️} |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
