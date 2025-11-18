@@ -14,7 +14,9 @@ Write your environment variables once, use them everywhere.
 
 - 🚀 **14+ Shells**: Bash, Zsh, Fish, PowerShell, Nushell, Xonsh, and more
 - 📝 **Simple TOML Config**: Easy to read and write
-- 🔄 **Variable References**: Use `$PATH`, `$HOME`, etc. in your config
+- 🔄 **Variable References**: Use `$VAR` to reference other config variables
+- 🔗 **Auto Dependency Resolution**: Variables sorted topologically
+- 📦 **Array Spreading**: Array elements expand properly in all shells
 - 🧹 **PATH Deduplication**: Remove duplicate paths automatically
 - 🌍 **Cross-Platform**: Linux, macOS, and Windows
 - ⚡ **Single Binary**: No dependencies to install
@@ -22,7 +24,7 @@ Write your environment variables once, use them everywhere.
 ## Supported Shells
 
 - **POSIX-compliant**: sh, bash, zsh, ksh, ash
-- **Modern shells**: fish, nushell, xonsh, ion
+- **Modern shells**: fish, nushell, xonsh, ion, elvish
 - **C shells**: csh, tcsh
 - **Cross-platform**: PowerShell (Linux/macOS/Windows)
 - **Windows**: cmd/batch
@@ -64,36 +66,44 @@ Create `~/.genv.env`:
 EDITOR = "vim"
 MY_API_KEY = "secret123"
 
-# PATH with existing value
-PATH = [
-    "$PATH",              # Keep current PATH
-    "/usr/local/bin",
-    "$HOME/.local/bin"
-]
-
-# Reference other variables
+# Variable references - automatically sorted by dependencies
 GOPATH = "$HOME/go"
+GOBIN = "$GOPATH/bin"         # References GOPATH
+EDITOR_PATH = "$GOBIN/micro"  # References GOBIN
+
+# Arrays with variable references
+MY_BINS = ["~/.local/bin", "/opt/bin"]
+
+# PATH with array spreading
+PATH = [
+    "$PATH",                  # Keep current PATH
+    "$GOBIN",                 # Single variable
+    "$MY_BINS",              # Array elements spread automatically
+    "/usr/local/bin"
+]
 ```
+
+See [.genv.env.example](./.genv.env.example) for more examples.
 
 ### 2. Load Into Your Shell
 
 Pick your shell and add this to its config file on top of config file:
 
-### Bash / Zsh
+#### Bash / Zsh
 
 Add to `~/.bashrc` or `~/.zshrc`:
 ```bash
 eval "$(genv init bash)"  # or 'zsh'
 ```
 
-### Fish
+#### Fish
 
 Add to `~/.config/fish/config.fish`:
 ```fish
 genv init fish | source
 ```
 
-### PowerShell
+#### PowerShell
 
 Add to your PowerShell profile (`$PROFILE`):
 ```powershell
@@ -102,10 +112,10 @@ Invoke-Expression (genv init pwsh | Out-String)
 
 To find your profile location:
 ```powershell
-echo $PROFILE
+Write-Host $PROFILE
 ```
 
-### nushell
+#### nushell
 
 Add to `~/.config/nushell/config.nu`:
 ```nu
@@ -113,14 +123,21 @@ genv init nu | save -f ~/.config/nushell/genv.nu
 use ~/.config/nushell/genv.nu
 ```
 
-### xonsh
+#### xonsh
 
 Add to `~/.xonshrc`:
 ```python
 execx($(genv init xonsh))
 ```
 
-### Other Shells
+#### Elvish
+
+Add to `~/.config/elvish/rc.elv`:
+```elvish
+eval (genv init elvish | slurp)
+```
+
+#### Other Shells
 
 <details>
 <summary>Click to expand</summary>
@@ -160,7 +177,11 @@ load(io.popen('genv init clink'):read('*a'))()
 
 ## Configuration Guide
 
+Your configuration is stored in `~/.genv.env` in TOML format.
+
 ### Basic Variables
+
+Define simple string variables as key-value pairs.
 
 ```toml
 EDITOR = "vim"
@@ -168,34 +189,90 @@ NAME = "John Doe"
 API_KEY = "secret"
 ```
 
-### PATH Variables
+### Arrays and PATH Management
 
-Use arrays for PATH-like variables. They'll be joined with the right separator for each shell (`:` on Unix, `;` on Windows):
+You can define array variables, which is ideal for `PATH`-like variables. `genv` automatically uses the correct syntax for each shell (e.g., colon-separated strings, or native shell lists).
 
 ```toml
+# For PATH, genv uses the shell's native mechanism if available
 PATH = [
     "$PATH",              # Keep existing PATH
     "/usr/local/bin",
     "$HOME/.local/bin"
 ]
 
-LD_LIBRARY_PATH = ["$LD_LIBRARY_PATH", "/usr/local/lib"]
+# This also works for other array variables
+FPATH = [
+    "/usr/local/share/functions",
+    "$HOME/.functions"
+]
 ```
+On shells that do not have native array support for environment variables, `genv` will join the array with the OS-specific path separator (`:` on Unix-like systems, `;` on Windows).
 
 ### Variable References
 
-Reference other environment variables with `$NAME`:
+Reference other variables using the `$NAME` or `${NAME}` syntax. Variables are automatically sorted by dependencies (topological sort).
 
 ```toml
-# Simple reference
+# Reference system variables like $HOME
 PROJECT_DIR = "$HOME/projects"
 
-# Reference config-defined variables
+# Reference variables defined in this file
 GOPATH = "$HOME/go"
-PATH = ["$PATH", "$GOPATH/bin"]  # $GOPATH defined above
+GOBIN = "$GOPATH/bin"           # References GOPATH
+MY_EDITOR = "$GOBIN/micro"      # References GOBIN
 
-# Tilde expansion
+# Add to PATH
+PATH = ["$PATH", "$GOBIN"]
+
+# Order doesn't matter - automatic dependency resolution!
+# These will be reordered automatically:
+LEVEL_3 = "$LEVEL_2/subdir"     # Uses LEVEL_2
+LEVEL_1 = "$PROJECT_DIR/src"    # Uses PROJECT_DIR  
+LEVEL_2 = "$LEVEL_1/build"      # Uses LEVEL_1
+# Output: PROJECT_DIR -> LEVEL_1 -> LEVEL_2 -> LEVEL_3
+```
+
+### Array Variable References
+
+Arrays can reference other arrays, and elements will spread properly:
+
+```toml
+# Define array variables
+MY_BINS = ["~/.local/bin", "/opt/bin"]
+DEV_BINS = ["/usr/local/go/bin", "$GOBIN"]
+
+# Reference arrays in other arrays - elements spread automatically!
+PATH = [
+    "$PATH",
+    "$MY_BINS",      # Both elements from MY_BINS are added
+    "$DEV_BINS",     # Both elements from DEV_BINS are added
+    "/extra/bin"
+]
+```
+
+**Shell-specific behavior:**
+- **Nushell**: Uses spread operator `...$env.VAR`
+- **Fish**: PATH is native array, others are colon-separated strings
+- **Elvish**: Uses colon `:` on Unix, semicolon `;` on Windows
+- **Bash/Zsh/etc**: Colon-separated strings
+
+### Tilde Expansion
+
+`genv` automatically expands the tilde character (`~`) to your home directory.
+
+```toml
 CONFIG_DIR = "~/.config/myapp"
+# Expands to /home/user/.config/myapp on Linux/macOS
+```
+
+### Comments
+
+Your configuration file can include comments.
+
+```toml
+# This is a comment
+API_KEY = "secret" # This is an inline comment
 ```
 
 ## Advanced Options
@@ -212,15 +289,13 @@ Works with: bash, zsh, fish, pwsh, nu, xonsh
 
 ### Alphabetical Sorting
 
-Sort variables alphabetically (PATH stays at the end):
+Variables are automatically sorted by dependencies (topological sort). The `--sort` flag adds alphabetical sorting within each dependency level for consistency:
 
 ```bash
 eval "$(genv init --sort bash)"
 ```
 
-> ![WARNING]
->
-> May cause issues if variables depend on each other's order.
+**Note:** This is mainly useful for aesthetic consistency. Variables are already sorted correctly by dependencies regardless of this flag.
 
 ### Show Warnings
 
@@ -292,6 +367,15 @@ Python-style lists with proper `$VARIABLE` references.
 
 Clink is a CMD enhancement for Windows that supports Lua scripting. Variables like `$GOPATH` are automatically converted to `os.getenv('GOPATH')`. Clink auto-loads Lua files from `%LOCALAPPDATA%\clink\`, making it more convenient than batch files.
 
+### Elvish
+
+`genv` generates idiomatic Elvish code:
+- Variables like `$HOME` are converted to Elvish's environment variable syntax, e.g., `$E:HOME`.
+- For `PATH`, `genv` manipulates the special `$paths` list variable.
+- Other array variables are handled using `str:join` with a colon separator.
+- Self-references in arrays (like `PATH = ["/new/path", "$PATH"]`) are correctly expanded using the splice operator (`@`), e.g., `set paths = [/new/path $@paths]`.
+- PATH deduplication is supported.
+
 ## Development
 
 This project uses [Taskfile](https://taskfile.dev/) for task automation.
@@ -344,32 +428,6 @@ task build-windows
 2. **Expand**: Expands environment variable references (e.g., `$HOME`, `$PATH`)
 3. **Generate**: Creates shell-specific initialization script with proper syntax
 4. **Output**: Prints to stdout for eval or piping to a file
-
-## CI/CD
-
-This project uses GitHub Actions for continuous integration and deployment:
-
-- **CI Workflow**: Runs on every push and PR
-  - Tests on Linux, macOS, and Windows
-  - Tests with Go 1.21, 1.22, and 1.23
-  - Runs linting with golangci-lint
-  - Uploads coverage to Codecov
-  - Builds binaries for all platforms
-
-- **Shell Integration Tests**: Actual shell testing
-  - Tests 15+ real shells on Linux, macOS, and Windows
-  - Verifies variable assignment and PATH expansion
-  - Validates PowerShell OS-aware delimiters
-  - Runs syntax checkers (shellcheck, fish -n, etc.)
-  - Tests: Bash, Zsh, Ksh, Fish, Tcsh, PowerShell, Nushell, Ion, CMD
-
-- **Release Workflow**: Triggered by version tags (e.g., `v1.0.0`)
-  - Builds release binaries for all platforms
-  - Generates SHA256 checksums
-  - Creates GitHub Release with artifacts
-  - Extracts release notes from CHANGELOG.md
-
-See [.github/WORKFLOWS.md](.github/WORKFLOWS.md) for detailed documentation.
 
 ## Contributing
 

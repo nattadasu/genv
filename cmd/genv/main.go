@@ -42,7 +42,7 @@ func handleInitCommand() {
 	configPath := initCmd.String("path", "", "Path to custom config file (default: ~/.genv.env)")
 	showWarnings := initCmd.Bool("warnings", false, "Show warnings about variable references")
 	dedupePath := initCmd.Bool("dedupe-path", false, "Remove duplicate entries from PATH-like variables")
-	sortKeys := initCmd.Bool("sort", false, "Sort variables alphabetically (PATH always last)")
+	sortKeys := initCmd.Bool("sort", false, "Sort variables alphabetically within dependency levels")
 	showHelp := initCmd.Bool("help", false, "Show help for init command")
 
 	if err := initCmd.Parse(os.Args[2:]); err != nil {
@@ -125,8 +125,8 @@ func printInitHelp() {
 	fmt.Println("      Supported: bash, zsh, fish, pwsh, nu, xonsh")
 	fmt.Println()
 	fmt.Println("  --sort")
-	fmt.Println("      Sort variables alphabetically (PATH stays last)")
-	fmt.Println("      Warning: May break if variables reference each other")
+	fmt.Println("      Sort variables alphabetically within each dependency level")
+	fmt.Println("      Note: Variables are already sorted by dependencies automatically")
 	fmt.Println()
 	fmt.Println("  --warnings")
 	fmt.Println("      Show warnings about config issues")
