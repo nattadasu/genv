@@ -65,29 +65,85 @@ func (s *FishShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[st
 		sb.WriteString("\n")
 	}
 
+	// Build a map of array variables for reference detection
+	arrayVars := make(map[string]bool)
+	for _, v := range vars {
+		if v.IsArray {
+			arrayVars[v.Key] = true
+		}
+	}
+
 	for _, envVar := range vars {
 		if envVar.IsArray {
-			// Fish uses space-separated values for arrays
-			var processedValues []string
-			for _, val := range envVar.Values {
-				expanded := parser.ExpandEnvVar(val, envVar.Key)
-				// Check if this is a self-reference
-				if expanded == "$"+envVar.Key {
-					processedValues = append(processedValues, expanded)
-				} else {
-					// Quote array values in fish
-					processedValues = append(processedValues, fmt.Sprintf("\"%s\"", escapeFishString(expanded)))
+			isPATH := strings.ToUpper(envVar.Key) == "PATH"
+			
+			if isPATH {
+				// PATH uses Fish's native space-separated array syntax
+				var processedValues []string
+				for _, val := range envVar.Values {
+					var expanded string
+					if definedKeys != nil {
+						expanded = parser.ExpandEnvVarWithDefined(val, envVar.Key, definedKeys)
+					} else {
+						expanded = parser.ExpandEnvVar(val, envVar.Key)
+					}
+					// Check if this is a self-reference
+					if expanded == "$"+envVar.Key {
+						processedValues = append(processedValues, expanded)
+					} else if strings.HasPrefix(expanded, "$") && !strings.Contains(expanded, "/") {
+						// Check if this is a reference to another array variable
+						refVar := strings.TrimPrefix(expanded, "$")
+						if arrayVars[refVar] {
+							// Use direct array reference for array variables in Fish
+							processedValues = append(processedValues, "$"+refVar)
+						} else {
+							// Single variable reference
+							processedValues = append(processedValues, fmt.Sprintf("\"%s\"", escapeFishString(expanded)))
+						}
+					} else {
+						// Quote array values in fish
+						processedValues = append(processedValues, fmt.Sprintf("\"%s\"", escapeFishString(expanded)))
+					}
+				}
+				value := strings.Join(processedValues, " ")
+				sb.WriteString(fmt.Sprintf("set -gx %s %s\n", envVar.Key, value))
+
+				// Add deduplication call if requested
+				if dedupePath {
+					sb.WriteString(fmt.Sprintf("set -gx %s (__genv_dedupe_path $%s)\n", envVar.Key, envVar.Key))
+				}
+			} else {
+				// Other array variables become colon-separated strings (like MANPATH)
+				var processedValues []string
+				for _, val := range envVar.Values {
+					var expanded string
+					if definedKeys != nil {
+						expanded = parser.ExpandEnvVarWithDefined(val, envVar.Key, definedKeys)
+					} else {
+						expanded = parser.ExpandEnvVar(val, envVar.Key)
+					}
+					// Check if this is a self-reference
+					if expanded == "$"+envVar.Key {
+						processedValues = append(processedValues, expanded)
+					} else {
+						processedValues = append(processedValues, expanded)
+					}
+				}
+				value := strings.Join(processedValues, ":")
+				sb.WriteString(fmt.Sprintf("set -gx %s \"%s\"\n", envVar.Key, escapeFishString(value)))
+
+				// Add deduplication call if requested and variable is PATH-like
+				if dedupePath && isPathLikeVar(envVar.Key) {
+					sb.WriteString(fmt.Sprintf("set -gx %s (__genv_dedupe_path $%s)\n", envVar.Key, envVar.Key))
 				}
 			}
-			value := strings.Join(processedValues, " ")
-			sb.WriteString(fmt.Sprintf("set -gx %s %s\n", envVar.Key, value))
-
-			// Add deduplication call if requested and variable is PATH-like
-			if dedupePath && isPathLikeVar(envVar.Key) {
-				sb.WriteString(fmt.Sprintf("set -gx %s (__genv_dedupe_path $%s)\n", envVar.Key, envVar.Key))
-			}
 		} else {
-			expanded := parser.ExpandEnvVar(envVar.Values[0], envVar.Key)
+			var expanded string
+			if definedKeys != nil {
+				expanded = parser.ExpandEnvVarWithDefined(envVar.Values[0], envVar.Key, definedKeys)
+			} else {
+				expanded = parser.ExpandEnvVar(envVar.Values[0], envVar.Key)
+			}
 			sb.WriteString(fmt.Sprintf("set -gx %s \"%s\"\n", envVar.Key, escapeFishString(expanded)))
 		}
 	}
