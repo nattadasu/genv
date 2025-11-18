@@ -715,14 +715,14 @@ jobs:
         try {
           .\genv.exe init --path test.env clink > test_clink.lua
           # Create a test script that loads clink config
-          @"
-@echo off
-clink inject --profile . --quiet
-call test.bat
-if not "%EDITOR%"=="C:\\Program Files\\Vim\\vim.exe" (exit /b 1)
-if not "%GENV_TEST%"=="integration-windows" (exit /b 1)
-if not "%GOPATH%"=="C:\\Go" (exit /b 1)
-"@ | Out-File -FilePath test_clink.bat -Encoding ascii
+          @'
+          @echo off
+          clink inject --profile . --quiet
+          call test.bat
+          if not "%EDITOR%"=="C:\\Program Files\\Vim\\vim.exe" (exit /b 1)
+          if not "%GENV_TEST%"=="integration-windows" (exit /b 1)
+          if not "%GOPATH%"=="C:\\Go" (exit /b 1)
+          '@ | Out-File -FilePath test_clink.bat -Encoding ascii
           
           # Copy lua file to clink profile
           New-Item -ItemType Directory -Force -Path ".clink" | Out-Null
@@ -754,7 +754,7 @@ if not "%GOPATH%"=="C:\\Go" (exit /b 1)
         Write-Host "`n=== Testing Nushell ==="
         try {
           # Add nushell to PATH
-          $env:PATH = "${env:LOCALAPPDATA}\Microsoft\WinGet\Packages\Nushell.Nushell_Microsoft.Winget.Source_8wekyb3d8bbwe;$env:PATH"
+          $env:PATH = "${env:LOCALAPPDATA}\Microsoft\WinGet\Packages\Nushell.Nushell_Microsoft.Winget.Source_8wekyb3d8bbwe;${env:PATH}"
           
           if (-not (Get-Command nu -ErrorAction SilentlyContinue)) {
             Write-Host "Nushell not found, skipping test"
@@ -763,14 +763,13 @@ if not "%GOPATH%"=="C:\\Go" (exit /b 1)
           }
           
           .\genv.exe init --path test.env nushell | Out-File -FilePath test.nu -Encoding utf8
-          $testScript = @"
-source test.nu
-if `$env.EDITOR != "C:\\Program Files\\Vim\\vim.exe" { exit 1 }
-if `$env.GENV_TEST != "integration-windows" { exit 1 }
-if `$env.GOPATH != "C:\\Go" { exit 1 }
-if (`$env.PATH | str contains "C:\\Go\\bin" | not) { exit 1 }
-"@
-          $testScript | Out-File -FilePath test_nu.nu -Encoding utf8
+          @"
+          source test.nu
+          if `$env.EDITOR != "C:\\Program Files\\Vim\\vim.exe" { exit 1 }
+          if `$env.GENV_TEST != "integration-windows" { exit 1 }
+          if `$env.GOPATH != "C:\\Go" { exit 1 }
+          if (`$env.PATH | str contains "C:\\Go\\bin" | not) { exit 1 }
+          "@ | Out-File -FilePath test_nu.nu -Encoding utf8
           nu test_nu.nu
           if ($LASTEXITCODE -ne 0) { throw "Nushell test failed" }
           Write-Host "✓ Nushell integration test passed"
@@ -838,13 +837,12 @@ if (`$env.PATH | str contains "C:\\Go\\bin" | not) { exit 1 }
           
           .\genv.exe init --path test.env elvish | Out-File -FilePath test.elv -Encoding utf8
           # Test Elvish with semicolon delimiter on Windows
-          $testScript = @"
-eval (cat test.elv | slurp)
-if (!=s `$E:EDITOR "C:\\Program Files\\Vim\\vim.exe") { exit 1 }
-if (!=s `$E:GENV_TEST "integration-windows") { exit 1 }
-if (!=s `$E:GOPATH "C:\\Go") { exit 1 }
-"@
-          $testScript | Out-File -FilePath test_elv.elv -Encoding utf8
+          @"
+          eval (cat test.elv | slurp)
+          if (!=s `$E:EDITOR "C:\\Program Files\\Vim\\vim.exe") { exit 1 }
+          if (!=s `$E:GENV_TEST "integration-windows") { exit 1 }
+          if (!=s `$E:GOPATH "C:\\Go") { exit 1 }
+          "@ | Out-File -FilePath test_elv.elv -Encoding utf8
           elvish test_elv.elv
           if ($LASTEXITCODE -ne 0) { throw "Elvish test failed" }
           Write-Host "✓ Elvish integration test passed (semicolon delimiter verified)"
