@@ -192,28 +192,13 @@ func ExpandEnvVarWithDefined(value string, key string, definedKeys map[string]bo
 	if strings.Contains(value, "$") {
 		// Use a custom expansion function
 		expanded := os.Expand(value, func(varName string) string {
-			// Special handling for HOME if not set (use UserHomeDir)
-			if varName == "HOME" {
-				if homeVal, exists := os.LookupEnv("HOME"); exists {
-					return homeVal
-				}
-				homeDir, err := os.UserHomeDir()
-				if err == nil {
-					return homeDir
-				}
-			}
-
 			// If variable is defined in config, assume it will be available (keep as $VAR)
 			if definedKeys != nil && definedKeys[varName] {
 				return "$" + varName
 			}
 
-			// Check if variable exists in environment
-			if val, exists := os.LookupEnv(varName); exists {
-				return val
-			}
-
-			// Return as-is with $ prefix for non-existent variables
+			// For variables not in config, keep as-is for shell to expand at runtime
+			// This preserves $HOME, $USER, $PATH, etc. as variable references
 			return "$" + varName
 		})
 		return expanded
