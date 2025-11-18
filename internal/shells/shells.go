@@ -34,6 +34,8 @@ func GetShell(name string) (Shell, error) {
 		return &CmdShell{}, nil
 	case "clink":
 		return &ClinkShell{}, nil
+	case "elvish", "elv":
+		return &ElvishShell{}, nil
 	case "ion":
 		return &IonShell{}, nil
 	case "rc":
@@ -48,6 +50,6 @@ func GetSupportedShells() []string {
 	return []string{
 		"sh", "bash", "zsh", "ksh", "ash",
 		"fish", "powershell", "nushell", "xonsh",
-		"csh", "tcsh", "cmd", "clink", "ion", "rc",
+		"csh", "tcsh", "cmd", "clink", "elvish", "ion", "rc",
 	}
 }

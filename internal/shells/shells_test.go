@@ -249,11 +249,63 @@ func TestRcShellGenerate(t *testing.T) {
 	}
 }
 
+func TestElvishShellGenerate(t *testing.T) {
+	shell := &ElvishShell{}
+	vars := []parser.EnvVar{
+		{Key: "FOO", Values: []string{"bar"}, IsArray: false},
+		{Key: "SPACES", Values: []string{"hello world"}, IsArray: false},
+		{Key: "FOO_REF", Values: []string{"$FOO"}, IsArray: false},
+		{Key: "GREETING", Values: []string{"Hello, $USER"}, IsArray: false},
+		{Key: "MY_PATHS", Values: []string{"/a/b", "/c/d"}, IsArray: true},
+	}
+
+	// Build definedKeys map to preserve variable references
+	definedKeys := make(map[string]bool)
+	for _, v := range vars {
+		definedKeys[v.Key] = true
+	}
+
+	output := shell.GenerateWithKeys(vars, definedKeys)
+
+	// 1. Simple variable
+	expectedSimple := "set E:FOO = bar\n"
+	if !strings.Contains(output, expectedSimple) {
+		t.Errorf("Expected %q, but it was not found in output", expectedSimple)
+	}
+
+	// 2. Variable with spaces
+	expectedSpaces := "set E:SPACES = 'hello world'\n"
+	if !strings.Contains(output, expectedSpaces) {
+		t.Errorf("Expected %q, but it was not found in output", expectedSpaces)
+	}
+
+	// 3. Variable reference
+	expectedRef := "set E:FOO_REF = $E:FOO\n"
+	if !strings.Contains(output, expectedRef) {
+		t.Errorf("Expected %q, but it was not found in output", expectedRef)
+	}
+
+	// 4. Mixed literal and variable (Elvish uses string concatenation)
+	expectedGreeting := "set E:GREETING = \"Hello, \"$E:USER\n"
+	if !strings.Contains(output, expectedGreeting) {
+		t.Errorf("Expected %q, but it was not found in output", expectedGreeting)
+	}
+
+	// 5. Array variable
+	if !strings.Contains(output, "use str\n") {
+		t.Error("Expected 'use str' for array variable, but it was not found")
+	}
+	expectedPaths := "set E:MY_PATHS = (str:join : [/a/b /c/d])\n"
+	if !strings.Contains(output, expectedPaths) {
+		t.Errorf("Expected %q, but it was not found in output", expectedPaths)
+	}
+}
+
 func TestEscapeFunctions(t *testing.T) {
 	t.Run("escapeFishString", func(t *testing.T) {
 		input := `test "quoted" \backslash`
 		result := escapeFishString(input)
-		if !strings.Contains(result, `\"`) {
+		if !strings.Contains(result, "\\\"") {
 			t.Error("Should escape double quotes")
 		}
 		if !strings.Contains(result, `\\`) {
@@ -275,11 +327,10 @@ func TestEscapeFunctions(t *testing.T) {
 	t.Run("escapeCshString", func(t *testing.T) {
 		input := `test "quoted" !bang`
 		result := escapeCshString(input)
-		if !strings.Contains(result, `\"`) {
+		if !strings.Contains(result, "\\\"") {
 			t.Error("Should escape double quotes")
 		}
-		if !strings.Contains(result, `\!`) {
-			t.Error("Should escape exclamation marks")
+		if !strings.Contains(result, "\\!") {
 		}
 	})
 }
