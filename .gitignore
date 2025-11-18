@@ -38,3 +38,6 @@ Thumbs.db
 .genv.env.local
 test.env
 coverage.txt
+
+# Task
+.task/

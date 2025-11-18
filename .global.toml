@@ -1,5 +1,0 @@
-EDITOR = "/usr/bin/micro"
-HELLO = "Hiiiii!!!"
-PATH = ["$PATH", "/usr/bin/bins"]
-MY_VAR = "This is a $TEST variable"
-OTHER_VAR = "simple value"
