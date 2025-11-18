@@ -8,18 +8,41 @@
 
 **A fricking damn simple and fast user-scope global environment variables loader for most shells**
 
-Write your environment variables once, use them everywhere.
+Write your environment variables once, in a single file, and use them everywhere. `genv` provides a robust, cross-platform solution for managing your global shell environment from one central configuration.
 
 ## Features
 
-- 🚀 **14+ Shells**: Bash, Zsh, Fish, PowerShell, Nushell, Xonsh, and more
-- 📝 **Simple TOML Config**: Easy to read and write
-- 🔄 **Variable References**: Use `$VAR` to reference other config variables
-- 🔗 **Auto Dependency Resolution**: Variables sorted topologically
-- 📦 **Array Spreading**: Array elements expand properly in all shells
-- 🧹 **PATH Deduplication**: Remove duplicate paths automatically
-- 🌍 **Cross-Platform**: Linux, macOS, and Windows
-- ⚡ **Single Binary**: No dependencies to install
+- 🚀 **Universal Shell Support**: Works with 14+ shells, including Bash, Zsh, Fish, PowerShell, and Nushell.
+- 📝 **Simple TOML Config**: A clean, human-readable format for your variables.
+- 🔗 **Variable References**: Reference other variables with `$VAR` syntax, including system variables.
+- 🧠 **Automatic Dependency Resolution**: Variables are topologically sorted, so you don't have to worry about declaration order.
+- 📦 **Advanced PATH & Array Management**: `PATH` and other array variables are handled natively, with support for spreading and deduplication.
+- 🌍 **Cross-Platform**: A single binary that runs on Linux, macOS, and Windows.
+- ⚡ **Zero Dependencies**: Just one executable file. No interpreters or libraries needed.
+
+## Why `genv`?
+
+Most environment loaders are either project-specific (loading `.env` for a single command) or directory-based (activating when you `cd` into a folder). `genv` is different: it focuses on managing your **global, user-level environment** for all your interactive shells.
+
+It's the perfect tool for centralizing variables you always need, like `GOPATH`, `EDITOR`, API keys for personal projects, or custom `PATH` entries, without cluttering your shell's startup files (`.bashrc`, `.zshrc`, etc.) with `export` commands.
+
+### Comparison with Other Tools
+
+Here’s how `genv` compares to other popular environment management tools:
+
+| Feature                  | `genv`                                       | `dotenvx`                                         | `direnv`                                                 | `atuin`                                                    |
+| ------------------------ | -------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------- |
+| **Scope**                | **User-Global**                              | Command / Project                                 | **Directory-Based**                                      | **User-Global (Synced)**                                   |
+| **Main Use Case**        | Set global env vars for interactive shells   | Load `.env` file for a single command execution   | Load/unload env vars as you `cd` into/out of directories | Sync shell history, aliases, and env vars across machines  |
+| **Configuration**        | `~/.genv.env` (TOML)                         | `.env` (key-value pairs)                          | `.envrc` (shell script)                                  | `atuin dotenv var set/sync` commands                       |
+| **Shell Support**        | **14+** (sh, bash, zsh, fish, nu, pwsh, ...)  | Any (loads vars into a child process)             | bash, zsh, tcsh, fish, elvish, powershell, nu, murex      | bash, zsh, fish, nushell, xonsh                            |
+| **Shell Integration**    | **Deep** (generates native shell code)       | None (it's a command wrapper)                     | **Deep** (hooks into the shell prompt)                   | **Deep** (hooks into shell for history and sync)           |
+| **Variable References**  | ✅ Yes                                       | ✅ Yes                                            | ✅ Yes (via shell script logic)                            | ❌ No (simple key-value store)                             |
+| **Array/PATH Management**| ✅ Yes (native, spreading, dedupe)           | ❌ No                                             | ✅ Yes (via `PATH_add` helper)                             | ❌ No                                                      |
+| **Dependency Resolution**| ✅ Yes (topological sort)                    | ❌ No                                             | ❌ No (user manages order)                               | ❌ No                                                      |
+| **Security**             | Plain text config                            | ✅ Encrypted `.env` files                         | ✅ `direnv allow` approval mechanism                       | ✅ End-to-end encrypted sync                               |
+| **Dependencies**         | Single Go binary                             | Single Go binary                                  | Single Go binary                                         | Single Rust binary                                         |
+
 
 ## Supported Shells
 
@@ -376,6 +399,13 @@ Clink is a CMD enhancement for Windows that supports Lua scripting. Variables li
 - Self-references in arrays (like `PATH = ["/new/path", "$PATH"]`) are correctly expanded using the splice operator (`@`), e.g., `set paths = [/new/path $@paths]`.
 - PATH deduplication is supported.
 
+## How It Works
+
+1.  **Parse**: Reads `~/.genv.env` and parses the TOML configuration.
+2.  **Resolve**: Expands all variable references (`$VAR`) and topologically sorts them based on dependencies.
+3.  **Generate**: Creates a shell-specific script with the correct syntax for defining variables.
+4.  **Output**: Prints the script to stdout, ready to be evaluated by your shell.
+
 ## Development
 
 This project uses [Taskfile](https://taskfile.dev/) for task automation.
@@ -394,67 +424,19 @@ task install          # Install to $GOPATH/bin
 task demo             # Demo all shell outputs
 ```
 
-### Running Tests
-
-```bash
-# Run all tests
-task test
-
-# Run tests with coverage
-task test-coverage
-
-# Run all checks (fmt, vet, test)
-task check
-```
-
-### Building
-
-```bash
-# Build for current platform
-task build
-
-# Build for all platforms (Linux, macOS, Windows)
-task build-all
-
-# Build for specific platform
-task build-linux
-task build-macos
-task build-windows
-```
-
-## How It Works
-
-1. **Parse**: Reads `~/.genv.env` and parses TOML configuration
-2. **Expand**: Expands environment variable references (e.g., `$HOME`, `$PATH`)
-3. **Generate**: Creates shell-specific initialization script with proper syntax
-4. **Output**: Prints to stdout for eval or piping to a file
-
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run tests (`task test`)
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
+1. Fork the repository.
+2. Create your feature branch (`git checkout -b feature/amazing-feature`).
+3. Make your changes.
+4. Run checks to ensure quality (`task check`).
+5. Commit your changes (`git commit -m 'Add amazing feature'`).
+6. Push to the branch (`git push origin feature/amazing-feature`).
+7. Open a Pull Request.
 
 **Note**: All PRs must pass CI checks (tests, linting, builds on all platforms).
-
-## Testing
-
-The project has comprehensive test coverage:
-- Parser tests (TOML parsing, variable expansion)
-- Generator tests (script generation)
-- Shell-specific tests (output validation)
-
-Run tests with:
-```bash
-task test           # Run all tests
-task test-coverage  # Generate coverage report
-```
 
 ## License
 
@@ -464,4 +446,4 @@ task test-coverage  # Generate coverage report
 
 - Built with [Go](https://golang.org/)
 - TOML parsing by [BurntSushi/toml](https://github.com/BurntSushi/toml)
-- Task automation by [Taskfile](https://taskfile.dev/)s
+- Task automation by [Taskfile](https://taskfile.dev/)
