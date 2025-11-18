@@ -343,7 +343,14 @@ jobs:
         fi
         echo "=== Testing Xonsh ==="
         ./genv init --path test.env xonsh > test.xsh
-        if xonsh -c 'source-bash test.xsh; test $EDITOR = "/usr/bin/vim" and $GENV_TEST = "integration" and $TEST_VALUE = "hello-world" and $GOPATH = "/opt/go"'; then
+        # Create test script
+        echo 'source-bash test.xsh' > test_xonsh.xsh
+        echo 'import os' >> test_xonsh.xsh
+        echo 'assert os.environ["EDITOR"] == "/usr/bin/vim"' >> test_xonsh.xsh
+        echo 'assert os.environ["GENV_TEST"] == "integration"' >> test_xonsh.xsh
+        echo 'assert os.environ["TEST_VALUE"] == "hello-world"' >> test_xonsh.xsh
+        echo 'assert os.environ["GOPATH"] == "/opt/go"' >> test_xonsh.xsh
+        if xonsh test_xonsh.xsh; then
           echo "XONSH_STATUS=✅" >> $GITHUB_ENV
           echo "✓ Xonsh integration test passed"
         else
@@ -704,7 +711,12 @@ jobs:
         Write-Host "`n=== Testing CMD ==="
         try {
           .\genv.exe init --path test.env cmd > test.bat
-          cmd /c "call test.bat && if not `"%EDITOR%`"==`"C:\\Program Files\\Vim\\vim.exe`" (exit /b 1) && if not `"%GENV_TEST%`"==`"integration-windows`" (exit /b 1) && if not `"%GOPATH%`"==`"C:\\Go`" (exit /b 1)"
+          # Create test script line by line
+          "call test.bat" | Out-File -FilePath test_cmd.bat -Encoding ascii
+          'if not "%EDITOR%"=="C:\Program Files\Vim\vim.exe" exit /b 1' | Out-File -FilePath test_cmd.bat -Encoding ascii -Append
+          'if not "%GENV_TEST%"=="integration-windows" exit /b 1' | Out-File -FilePath test_cmd.bat -Encoding ascii -Append
+          'if not "%GOPATH%"=="C:\Go" exit /b 1' | Out-File -FilePath test_cmd.bat -Encoding ascii -Append
+          cmd /c test_cmd.bat
           if ($LASTEXITCODE -ne 0) { throw "CMD test failed with exit code $LASTEXITCODE" }
           Write-Host "✓ CMD integration test passed"
           "CMD_STATUS=✅" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -728,15 +740,13 @@ jobs:
         Write-Host "`n=== Testing Clink ==="
         try {
           .\genv.exe init --path test.env clink > test_clink.lua
-          # Create a test script that loads clink config
-          @'
-          @echo off
-          clink inject --profile . --quiet
-          call test.bat
-          if not "%EDITOR%"=="C:\\Program Files\\Vim\\vim.exe" (exit /b 1)
-          if not "%GENV_TEST%"=="integration-windows" (exit /b 1)
-          if not "%GOPATH%"=="C:\\Go" (exit /b 1)
-          '@ | Out-File -FilePath test_clink.bat -Encoding ascii
+          # Create test script line by line
+          "@echo off" | Out-File -FilePath test_clink.bat -Encoding ascii
+          "clink inject --profile . --quiet" | Out-File -FilePath test_clink.bat -Encoding ascii -Append
+          "call test.bat" | Out-File -FilePath test_clink.bat -Encoding ascii -Append
+          'if not "%EDITOR%"=="C:\Program Files\Vim\vim.exe" exit /b 1' | Out-File -FilePath test_clink.bat -Encoding ascii -Append
+          'if not "%GENV_TEST%"=="integration-windows" exit /b 1' | Out-File -FilePath test_clink.bat -Encoding ascii -Append
+          'if not "%GOPATH%"=="C:\Go" exit /b 1' | Out-File -FilePath test_clink.bat -Encoding ascii -Append
           
           # Copy lua file to clink profile
           New-Item -ItemType Directory -Force -Path ".clink" | Out-Null
@@ -814,15 +824,14 @@ jobs:
           }
           
           .\genv.exe init --path test.env xonsh > test.xsh
-          # Xonsh test - use Python to validate environment variables
-          # Note: Xonsh on Windows has issues with PATH arrays, so we skip PATH validation
-          "import os" | Out-File -FilePath test_xonsh.py -Encoding utf8
-          "with open('test.xsh', 'r') as f:" | Out-File -FilePath test_xonsh.py -Encoding utf8 -Append
-          "    exec(f.read())" | Out-File -FilePath test_xonsh.py -Encoding utf8 -Append
-          "assert os.environ['EDITOR'] == r'C:\Program Files\Vim\vim.exe'" | Out-File -FilePath test_xonsh.py -Encoding utf8 -Append
-          "assert os.environ['GENV_TEST'] == 'integration-windows'" | Out-File -FilePath test_xonsh.py -Encoding utf8 -Append
-          "assert os.environ['GOPATH'] == r'C:\Go'" | Out-File -FilePath test_xonsh.py -Encoding utf8 -Append
-          python test_xonsh.py
+          # Create xonsh test script line by line
+          # Note: Skip PATH validation on Windows due to EnvPath compatibility issues
+          "source test.xsh" | Out-File -FilePath test_xonsh.xsh -Encoding utf8
+          "import os" | Out-File -FilePath test_xonsh.xsh -Encoding utf8 -Append
+          'if os.environ["EDITOR"] != r"C:\Program Files\Vim\vim.exe": exit(1)' | Out-File -FilePath test_xonsh.xsh -Encoding utf8 -Append
+          'if os.environ["GENV_TEST"] != "integration-windows": exit(1)' | Out-File -FilePath test_xonsh.xsh -Encoding utf8 -Append
+          'if os.environ["GOPATH"] != r"C:\Go": exit(1)' | Out-File -FilePath test_xonsh.xsh -Encoding utf8 -Append
+          xonsh test_xonsh.xsh
           if ($LASTEXITCODE -ne 0) { throw "Xonsh test failed" }
           Write-Host "✓ Xonsh integration test passed"
           "XONSH_STATUS=✅" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
