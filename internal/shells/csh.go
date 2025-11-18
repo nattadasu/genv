@@ -76,7 +76,12 @@ func (s *CshShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[str
 			// Join array values with colon for PATH-like variables
 			var processedValues []string
 			for _, val := range envVar.Values {
-				expanded := parser.ExpandEnvVar(val, envVar.Key)
+				var expanded string
+				if definedKeys != nil {
+					expanded = parser.ExpandEnvVarWithDefined(val, envVar.Key, definedKeys)
+				} else {
+					expanded = parser.ExpandEnvVar(val, envVar.Key)
+				}
 				// Check if this is a self-reference
 				if expanded == "$"+envVar.Key {
 					processedValues = append(processedValues, expanded)
@@ -87,7 +92,12 @@ func (s *CshShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[str
 			value := strings.Join(processedValues, ":")
 			sb.WriteString(fmt.Sprintf("setenv %s \"%s\"\n", envVar.Key, escapeCshString(value)))
 		} else {
-			expanded := parser.ExpandEnvVar(envVar.Values[0], envVar.Key)
+			var expanded string
+			if definedKeys != nil {
+				expanded = parser.ExpandEnvVarWithDefined(envVar.Values[0], envVar.Key, definedKeys)
+			} else {
+				expanded = parser.ExpandEnvVar(envVar.Values[0], envVar.Key)
+			}
 			sb.WriteString(fmt.Sprintf("setenv %s \"%s\"\n", envVar.Key, escapeCshString(expanded)))
 		}
 	}

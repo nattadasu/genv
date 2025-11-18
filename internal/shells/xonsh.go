@@ -80,7 +80,12 @@ func (s *XonshShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[s
 			// Xonsh uses Python list syntax
 			var processedValues []string
 			for _, val := range envVar.Values {
-				expanded := parser.ExpandEnvVar(val, envVar.Key)
+				var expanded string
+				if definedKeys != nil {
+					expanded = parser.ExpandEnvVarWithDefined(val, envVar.Key, definedKeys)
+				} else {
+					expanded = parser.ExpandEnvVar(val, envVar.Key)
+				}
 				// Check if this is a self-reference
 				if expanded == "$"+envVar.Key {
 					processedValues = append(processedValues, "$"+envVar.Key)
@@ -96,7 +101,12 @@ func (s *XonshShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[s
 				sb.WriteString(fmt.Sprintf("$%s = __genv_dedupe_path($%s)\n", envVar.Key, envVar.Key))
 			}
 		} else {
-			expanded := parser.ExpandEnvVar(envVar.Values[0], envVar.Key)
+			var expanded string
+			if definedKeys != nil {
+				expanded = parser.ExpandEnvVarWithDefined(envVar.Values[0], envVar.Key, definedKeys)
+			} else {
+				expanded = parser.ExpandEnvVar(envVar.Values[0], envVar.Key)
+			}
 			sb.WriteString(fmt.Sprintf("$%s = \"%s\"\n", envVar.Key, escapeXonshString(expanded)))
 		}
 	}

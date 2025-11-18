@@ -74,7 +74,12 @@ func (s *RcShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[stri
 		if envVar.IsArray {
 			var processedValues []string
 			for _, val := range envVar.Values {
-				expanded := parser.ExpandEnvVar(val, envVar.Key)
+				var expanded string
+				if definedKeys != nil {
+					expanded = parser.ExpandEnvVarWithDefined(val, envVar.Key, definedKeys)
+				} else {
+					expanded = parser.ExpandEnvVar(val, envVar.Key)
+				}
 				if expanded == "$"+envVar.Key {
 					processedValues = append(processedValues, expanded)
 				} else {
@@ -84,7 +89,12 @@ func (s *RcShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[stri
 			value := strings.Join(processedValues, " ")
 			sb.WriteString(fmt.Sprintf("%s=(%s)\n", envVar.Key, value))
 		} else {
-			expanded := parser.ExpandEnvVar(envVar.Values[0], envVar.Key)
+			var expanded string
+			if definedKeys != nil {
+				expanded = parser.ExpandEnvVarWithDefined(envVar.Values[0], envVar.Key, definedKeys)
+			} else {
+				expanded = parser.ExpandEnvVar(envVar.Values[0], envVar.Key)
+			}
 			sb.WriteString(fmt.Sprintf("%s='%s'\n", envVar.Key, escapeRcString(expanded)))
 		}
 	}
