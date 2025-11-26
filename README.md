@@ -8,40 +8,37 @@
 
 **A fricking damn simple and fast user-scope global environment variables loader for most shells**
 
-Write your environment variables once, in a single file, and use them everywhere. `genv` provides a robust, cross-platform solution for managing your global shell environment from one central configuration.
+Write your environment variables once, in a single file, and use them everywhere.
+`genv` provides a robust, cross-platform solution for managing your global
+shell environment from one central configuration.
 
 ## Features
 
-- 🚀 **Universal Shell Support**: Works with 14+ shells, including Bash, Zsh, Fish, PowerShell, and Nushell.
+- 🚀 **Universal Shell Support**: Works with 14+ shells.
 - 📝 **Simple TOML Config**: A clean, human-readable format for your variables.
-- 🔗 **Variable References**: Reference other variables with `$VAR` syntax, including system variables.
-- 🧠 **Automatic Dependency Resolution**: Variables are topologically sorted, so you don't have to worry about declaration order.
-- 📦 **Advanced PATH & Array Management**: `PATH` and other array variables are handled natively, with support for spreading and deduplication.
+- 🔗 **Variable References**: Reference other variables with `$VAR` syntax,
+  including system variables.
+- 🧠 **Automatic Dependency Resolution**: Variables are topologically sorted,
+  so you don't have to worry about declaration order.
+- 📦 **Advanced PATH & Array Management**: `PATH` and other array variables are
+  handled natively, with support for spreading and deduplication.
 - 🌍 **Cross-Platform**: A single binary that runs on Linux, macOS, and Windows.
-- ⚡ **Zero Dependencies**: Just one executable file. No interpreters or libraries needed.
+- ⚡ **Zero Dependencies**: Just one executable file. No interpreters or
+  libraries needed.
 
 ## Why `genv`?
 
-Most environment loaders are either project-specific (loading `.env` for a single command) or directory-based (activating when you `cd` into a folder). `genv` is different: it focuses on managing your **global, user-level environment** for all your interactive shells.
+Most environment loaders are either project-specific (loading `.env` for a
+single command) or directory-based (activating when you `cd` into a folder).
+`genv` is different: it focuses on managing your
+**global, user-level environment** for all your interactive shells.
 
-It's the perfect tool for centralizing variables you always need, like `GOPATH`, `EDITOR`, API keys for personal projects, or custom `PATH` entries, without cluttering your shell's startup files (`.bashrc`, `.zshrc`, etc.) with `export` commands.
+It's the perfect tool for centralizing variables you always need, like `GOPATH`,
+`EDITOR`, API keys for personal projects, or custom `PATH` entries, without
+cluttering your shell's startup files (`.bashrc`, `.zshrc`, etc.)
+with `export` commands.
 
-### Comparison with Other Tools
-
-Here’s how `genv` compares to other popular environment management tools:
-
-| Feature                  | `genv`                                       | `dotenvx`                                         | `direnv`                                                 | `atuin`                                                    |
-| ------------------------ | -------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------- |
-| **Scope**                | **User-Global**                              | Command / Project                                 | **Directory-Based**                                      | **User-Global (Synced)**                                   |
-| **Main Use Case**        | Set global env vars for interactive shells   | Load `.env` file for a single command execution   | Load/unload env vars as you `cd` into/out of directories | Sync shell history, aliases, and env vars across machines  |
-| **Configuration**        | `~/.genv.env` (TOML)                         | `.env` (key-value pairs)                          | `.envrc` (shell script)                                  | `atuin dotenv var set/sync` commands                       |
-| **Shell Support**        | **14+** (sh, bash, zsh, fish, nu, pwsh, ...)  | Any (loads vars into a child process)             | bash, zsh, tcsh, fish, elvish, powershell, nu, murex      | bash, zsh, fish, nushell, xonsh                            |
-| **Shell Integration**    | **Deep** (generates native shell code)       | None (it's a command wrapper)                     | **Deep** (hooks into the shell prompt)                   | **Deep** (hooks into shell for history and sync)           |
-| **Variable References**  | ✅ Yes                                       | ✅ Yes                                            | ✅ Yes (via shell script logic)                            | ❌ No (simple key-value store)                             |
-| **Array/PATH Management**| ✅ Yes (native, spreading, dedupe)           | ❌ No                                             | ✅ Yes (via `PATH_add` helper)                             | ❌ No                                                      |
-| **Dependency Resolution**| ✅ Yes (topological sort)                    | ❌ No                                             | ❌ No (user manages order)                               | ❌ No                                                      |
-| **Security**             | Plain text config                            | ✅ Encrypted `.env` files                         | ✅ `direnv allow` approval mechanism                       | ✅ End-to-end encrypted sync                               |
-| **Dependencies**         | Single Go binary                             | Single Go binary                                  | Single Go binary                                         | Single Rust binary                                         |
+Note that due to `genv` simple nature, it does not store in encrypted file.
 
 
 ## Supported Shells
@@ -49,7 +46,7 @@ Here’s how `genv` compares to other popular environment management tools:
 - **POSIX-compliant**: sh, bash, zsh, ksh, ash
 - **Modern shells**: fish, nushell, xonsh, ion, elvish
 - **C shells**: csh, tcsh
-- **Cross-platform**: PowerShell (Linux/macOS/Windows)
+- **Cross-platform**: PowerShell
 - **Windows**: cmd/batch
 - **Unix**: rc (Plan 9 shell)
 
@@ -99,10 +96,9 @@ MY_BINS = ["~/.local/bin", "/opt/bin"]
 
 # PATH with array spreading
 PATH = [
-    "$PATH",                  # Keep current PATH
     "$GOBIN",                 # Single variable
-    "$MY_BINS",              # Array elements spread automatically
-    "/usr/local/bin"
+    "$MY_BINS",               # Array elements spread automatically
+    "$PATH",                  # Keep current PATH
 ]
 ```
 
@@ -112,14 +108,14 @@ See [.genv.env.example](./.genv.env.example) for more examples.
 
 Pick your shell and add this to its config file on top of config file:
 
-#### Bash / Zsh
+#### bash / zsh / *any POSIX compliant*
 
 Add to `~/.bashrc` or `~/.zshrc`:
 ```bash
-eval "$(genv init bash)"  # or 'zsh'
+eval "$(genv init posix)"
 ```
 
-#### Fish
+#### fish
 
 Add to `~/.config/fish/config.fish`:
 ```fish
@@ -140,11 +136,8 @@ Write-Host $PROFILE
 
 #### nushell
 
-Add to `~/.config/nushell/config.nu`:
-```nu
-genv init nu | save -f ~/.config/nushell/genv.nu
-use ~/.config/nushell/genv.nu
-```
+Use `genv install-nu` to automate the task! Doing it manually would get
+unwanted result due to nushell's nature.
 
 #### xonsh
 
@@ -155,12 +148,20 @@ execx($(genv init xonsh))
 
 #### Elvish
 
+> [!WARNING]
+>
+> Support for following shell is not yet tested thoroughly
+
 Add to `~/.config/elvish/rc.elv`:
 ```elvish
 eval (genv init elvish | slurp)
 ```
 
 #### Other Shells
+
+> [!WARNING]
+>
+> Support for following shells are not yet tested thoroughly
 
 <details>
 <summary>Click to expand</summary>
@@ -182,7 +183,7 @@ eval $(genv init ion)
 
 **rc** - Add to `~/.rcrc`:
 ```rc
-eval `{genv init rc}
+eval `{genv init rc}  #`
 ```
 
 **CMD (Windows)** - Create batch file:
@@ -214,7 +215,9 @@ API_KEY = "secret"
 
 ### Arrays and PATH Management
 
-You can define array variables, which is ideal for `PATH`-like variables. `genv` automatically uses the correct syntax for each shell (e.g., colon-separated strings, or native shell lists).
+You can define array variables, which is ideal for `PATH`-like variables.
+`genv` automatically uses the correct syntax for each shell
+(e.g., colon-separated strings, or native shell lists).
 
 ```toml
 # For PATH, genv uses the shell's native mechanism if available
@@ -230,11 +233,14 @@ FPATH = [
     "$HOME/.functions"
 ]
 ```
-On shells that do not have native array support for environment variables, `genv` will join the array with the OS-specific path separator (`:` on Unix-like systems, `;` on Windows).
+On shells that do not have native array support for environment variables,
+`genv` will try to join the array with the OS-specific path separator
+(`:` on Unix-like systems, `;` on Windows).
 
 ### Variable References
 
-Reference other variables using the `$NAME` or `${NAME}` syntax. Variables are automatically sorted by dependencies (topological sort).
+Reference other variables using the `$NAME` or `${NAME}` syntax. Variables
+are automatically sorted by dependencies (topological sort).
 
 ```toml
 # Reference system variables like $HOME
@@ -275,10 +281,10 @@ PATH = [
 ```
 
 **Shell-specific behavior:**
-- **Nushell**: Uses spread operator `...$env.VAR`
-- **Fish**: PATH is native array, others are colon-separated strings
-- **Elvish**: Uses colon `:` on Unix, semicolon `;` on Windows
-- **Bash/Zsh/etc**: Colon-separated strings
+- **nushell**: Uses spread operator `...$env.VAR`
+- **xonsh**: Utilize array concat ` + $VAR`
+- **fish**: PATH is native array, others are colon-separated strings
+- **bash/zsh/etc**: Colon-separated strings, and 
 
 ### Tilde Expansion
 
@@ -302,7 +308,7 @@ API_KEY = "secret" # This is an inline comment
 
 ### Remove Duplicate Paths
 
-If your PATH has duplicates:
+If your `PATH` has duplicates:
 
 ```bash
 eval "$(genv init --dedupe-path bash)"
@@ -312,13 +318,19 @@ Works with: bash, zsh, fish, pwsh, nu, xonsh
 
 ### Alphabetical Sorting
 
-Variables are automatically sorted by dependencies (topological sort). The `--sort` flag adds alphabetical sorting within each dependency level for consistency:
+Variables are automatically sorted by dependencies (topological sort).
+The `--sort` flag adds alphabetical sorting within each dependency level
+for consistency:
 
 ```bash
 eval "$(genv init --sort bash)"
 ```
 
-**Note:** This is mainly useful for aesthetic consistency. Variables are already sorted correctly by dependencies regardless of this flag.
+> [!NOTE]
+>
+> This is mainly useful for aesthetic consistency.
+> Variables are already sorted correctly by dependencies regardless of this
+> flag.
 
 ### Show Warnings
 
@@ -366,7 +378,7 @@ Works on Linux, macOS, and Windows. Automatically uses the right path separator:
 
 Variable references become `${env:NAME}` syntax.
 
-### Nushell
+### nushell
 
 Variables like `$GOPATH` in your config become `$env.GOPATH` in Nushell.
 Arrays use native list syntax: `[...$env.PATH, "/new/path"]`
@@ -375,36 +387,35 @@ Arrays use native list syntax: `[...$env.PATH, "/new/path"]`
 
 Arrays are space-separated. Self-references like `$PATH` work natively.
 
-### Xonsh
+### xonsh
 
 Python-style lists with proper `$VARIABLE` references.
 
 ### Limited Support
 
-- **Csh/Tcsh**: PATH deduplication not available
+- **csh/tcsh**: PATH deduplication not available
 - **Ion**: Limited array support  
-- **Rc**: Limited string manipulation
+- **rc**: Limited string manipulation
 - **CMD**: Basic variable setting only
 
 ### Clink
 
-Clink is a CMD enhancement for Windows that supports Lua scripting. Variables like `$GOPATH` are automatically converted to `os.getenv('GOPATH')`. Clink auto-loads Lua files from `%LOCALAPPDATA%\clink\`, making it more convenient than batch files.
+Clink is a CMD enhancement for Windows that supports Lua scripting.
+Variables like `$GOPATH` are automatically converted to `os.getenv('GOPATH')`.
+Clink auto-loads Lua files from `%LOCALAPPDATA%\clink\`,
+making it more convenient than batch files.
 
 ### Elvish
 
 `genv` generates idiomatic Elvish code:
-- Variables like `$HOME` are converted to Elvish's environment variable syntax, e.g., `$E:HOME`.
+
+- Variables like `$HOME` are converted to Elvish's environment variable
+  syntax, e.g., `$E:HOME`.
 - For `PATH`, `genv` manipulates the special `$paths` list variable.
 - Other array variables are handled using `str:join` with a colon separator.
-- Self-references in arrays (like `PATH = ["/new/path", "$PATH"]`) are correctly expanded using the splice operator (`@`), e.g., `set paths = [/new/path $@paths]`.
+- Self-references in arrays (like `PATH = ["/new/path", "$PATH"]`) are correctly
+  expanded using the splice operator (`@`), e.g., `set paths = [/new/path $@paths]`.
 - PATH deduplication is supported.
-
-## How It Works
-
-1.  **Parse**: Reads `~/.genv.env` and parses the TOML configuration.
-2.  **Resolve**: Expands all variable references (`$VAR`) and topologically sorts them based on dependencies.
-3.  **Generate**: Creates a shell-specific script with the correct syntax for defining variables.
-4.  **Output**: Prints the script to stdout, ready to be evaluated by your shell.
 
 ## Development
 
