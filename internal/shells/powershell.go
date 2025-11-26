@@ -165,7 +165,7 @@ func (s *PowerShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[s
 
 			// Add deduplication call if requested and variable is PATH-like
 			if dedupePath && isPathLikeVar(envVar.Key) {
-				sb.WriteString(fmt.Sprintf("$env:%s = __genv_dedupe_path $env:%s\n", envVar.Key, envVar.Key))
+				sb.WriteString(fmt.Sprintf("$env:%s = Set-PathVariables -PathString $env:%s\n", envVar.Key, envVar.Key))
 			}
 		} else {
 			var expanded string
@@ -183,7 +183,7 @@ func (s *PowerShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[s
 
 func powershellDedupeFunction() string {
 	return `# Function to deduplicate paths
-function __genv_dedupe_path {
+function Set-PathVariables {
     param([string]$PathString)
     $delimiter = if ($IsWindows) { ';' } else { ':' }
     $paths = $PathString -split $delimiter
