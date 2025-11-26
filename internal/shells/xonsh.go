@@ -75,10 +75,14 @@ func (s *XonshShell) GenerateWithKeys(vars []parser.EnvVar, definedKeys map[stri
 			} else {
 				expanded = parser.ExpandEnvVar(envVar.Values[0], envVar.Key)
 			}
-			// Check if the expanded value is a pure variable reference
-			if strings.HasPrefix(expanded, "$") && !strings.ContainsAny(expanded[1:], " \t\n$\"'\\") {
+			// Check if the expanded value is a pure variable reference (starts with $ and contains only valid identifier chars)
+			if isPureVariableReference(expanded) {
 				// Pure variable reference - don't quote it
 				sb.WriteString(fmt.Sprintf("$%s = %s\n", envVar.Key, expanded))
+			} else if strings.Contains(expanded, "$") {
+				// Mixed content with variables - use .format()
+				formatStr, formatArgs := convertToXonshFormat(expanded)
+				sb.WriteString(fmt.Sprintf("$%s = \"%s\".format(%s)\n", envVar.Key, formatStr, formatArgs))
 			} else {
 				sb.WriteString(fmt.Sprintf("$%s = '%s'\n", envVar.Key, escapeXonshString(expanded)))
 			}
@@ -162,10 +166,14 @@ func (s *XonshShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[s
 			} else {
 				expanded = parser.ExpandEnvVar(envVar.Values[0], envVar.Key)
 			}
-			// Check if the expanded value is a pure variable reference
-			if strings.HasPrefix(expanded, "$") && !strings.ContainsAny(expanded[1:], " \t\n$\"'\\") {
+			// Check if the expanded value is a pure variable reference (starts with $ and contains only valid identifier chars)
+			if isPureVariableReference(expanded) {
 				// Pure variable reference - don't quote it
 				sb.WriteString(fmt.Sprintf("$%s = %s\n", envVar.Key, expanded))
+			} else if strings.Contains(expanded, "$") {
+				// Mixed content with variables - use .format()
+				formatStr, formatArgs := convertToXonshFormat(expanded)
+				sb.WriteString(fmt.Sprintf("$%s = \"%s\".format(%s)\n", envVar.Key, formatStr, formatArgs))
 			} else {
 				sb.WriteString(fmt.Sprintf("$%s = \"%s\"\n", envVar.Key, escapeXonshString(expanded)))
 			}
@@ -173,6 +181,87 @@ func (s *XonshShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[s
 	}
 
 	return sb.String()
+}
+
+// isPureVariableReference checks if a string is a pure variable reference
+// (e.g., "$VAR" or "$MY_VAR") without any additional text or special characters
+func isPureVariableReference(s string) bool {
+	if !strings.HasPrefix(s, "$") || len(s) < 2 {
+		return false
+	}
+	// Check if the rest contains only valid identifier characters (letters, digits, underscores)
+	for i, ch := range s[1:] {
+		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+			(ch >= '0' && ch <= '9') || ch == '_') {
+			// Allow numbers after first character
+			if i == 0 && (ch >= '0' && ch <= '9') {
+				return false
+			}
+			return false
+		}
+	}
+	return true
+}
+
+// convertToXonshFormat converts a string with $VAR references to Python .format() style
+// e.g., "Hello $USER from $HOME" -> ("Hello {0} from {1}", "$USER, $HOME")
+func convertToXonshFormat(s string) (string, string) {
+	var formatStr strings.Builder
+	var vars []string
+	var currentVar strings.Builder
+	inVar := false
+
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+
+		if ch == '$' && i+1 < len(s) {
+			// Start of a variable
+			inVar = true
+			currentVar.Reset()
+			continue
+		}
+
+		if inVar {
+			// Check if character is valid for variable name
+			if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+				(ch >= '0' && ch <= '9') || ch == '_' {
+				currentVar.WriteByte(ch)
+			} else {
+				// End of variable, add placeholder
+				if currentVar.Len() > 0 {
+					vars = append(vars, "$"+currentVar.String())
+					formatStr.WriteString(fmt.Sprintf("{%d}", len(vars)-1))
+					currentVar.Reset()
+				}
+				inVar = false
+				// Write the current character
+				if ch == '"' {
+					formatStr.WriteString("\\\"")
+				} else if ch == '\\' {
+					formatStr.WriteString("\\\\")
+				} else {
+					formatStr.WriteByte(ch)
+				}
+			}
+		} else {
+			// Regular character
+			if ch == '"' {
+				formatStr.WriteString("\\\"")
+			} else if ch == '\\' {
+				formatStr.WriteString("\\\\")
+			} else {
+				formatStr.WriteByte(ch)
+			}
+		}
+	}
+
+	// Handle case where string ends with a variable
+	if inVar && currentVar.Len() > 0 {
+		vars = append(vars, "$"+currentVar.String())
+		formatStr.WriteString(fmt.Sprintf("{%d}", len(vars)-1))
+	}
+
+	return formatStr.String(), strings.Join(vars, ", ")
 }
 
 func xonshDedupeFunction() string {
