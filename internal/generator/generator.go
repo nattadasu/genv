@@ -60,10 +60,10 @@ func GenerateWithOptions(shellName string, configPath string, showWarnings bool,
 // If alphabetical is true, also sorts alphabetically within dependency levels
 func topologicalSort(envVars []parser.EnvVar, alphabetical bool) []parser.EnvVar {
 	// Build dependency graph
-	deps := make(map[string][]string)     // key -> variables it depends on
-	inDegree := make(map[string]int)      // key -> number of dependencies
+	deps := make(map[string][]string) // key -> variables it depends on
+	inDegree := make(map[string]int)  // key -> number of dependencies
 	varMap := make(map[string]parser.EnvVar)
-	
+
 	// Initialize all variables
 	for _, v := range envVars {
 		varMap[v.Key] = v
@@ -71,7 +71,7 @@ func topologicalSort(envVars []parser.EnvVar, alphabetical bool) []parser.EnvVar
 			inDegree[v.Key] = 0
 		}
 	}
-	
+
 	// Extract dependencies from variable values
 	for _, v := range envVars {
 		dependencies := extractDependencies(v)
@@ -83,7 +83,7 @@ func topologicalSort(envVars []parser.EnvVar, alphabetical bool) []parser.EnvVar
 			}
 		}
 	}
-	
+
 	// Kahn's algorithm for topological sort
 	var queue []string
 	for key, degree := range inDegree {
@@ -91,28 +91,28 @@ func topologicalSort(envVars []parser.EnvVar, alphabetical bool) []parser.EnvVar
 			queue = append(queue, key)
 		}
 	}
-	
+
 	// Sort initial queue alphabetically if requested
 	if alphabetical {
 		sortStringSlice(queue)
 	}
-	
+
 	var result []parser.EnvVar
 	processed := make(map[string]bool)
-	
+
 	for len(queue) > 0 {
 		// Get next variable from queue
 		current := queue[0]
 		queue = queue[1:]
-		
+
 		if processed[current] {
 			continue
 		}
 		processed[current] = true
-		
+
 		// Add to result
 		result = append(result, varMap[current])
-		
+
 		// Update dependencies
 		var nextLevel []string
 		for key, depList := range deps {
@@ -129,14 +129,14 @@ func topologicalSort(envVars []parser.EnvVar, alphabetical bool) []parser.EnvVar
 				}
 			}
 		}
-		
+
 		// Sort next level alphabetically if requested
 		if alphabetical {
 			sortStringSlice(nextLevel)
 		}
 		queue = append(queue, nextLevel...)
 	}
-	
+
 	// Move PATH-like variables to the end
 	return movePathVarsToEnd(result)
 }
@@ -144,7 +144,7 @@ func topologicalSort(envVars []parser.EnvVar, alphabetical bool) []parser.EnvVar
 // extractDependencies finds all variable references in an EnvVar
 func extractDependencies(v parser.EnvVar) map[string]bool {
 	deps := make(map[string]bool)
-	
+
 	// Check all values
 	for _, val := range v.Values {
 		// Find all $VAR references
@@ -167,7 +167,7 @@ func extractDependencies(v parser.EnvVar) map[string]bool {
 			}
 		}
 	}
-	
+
 	return deps
 }
 
@@ -191,7 +191,7 @@ func sortStringSlice(s []string) {
 func movePathVarsToEnd(envVars []parser.EnvVar) []parser.EnvVar {
 	var pathVars []parser.EnvVar
 	var normalVars []parser.EnvVar
-	
+
 	for _, v := range envVars {
 		if isPathLikeKey(v.Key) {
 			pathVars = append(pathVars, v)
@@ -199,7 +199,7 @@ func movePathVarsToEnd(envVars []parser.EnvVar) []parser.EnvVar {
 			normalVars = append(normalVars, v)
 		}
 	}
-	
+
 	result := make([]parser.EnvVar, 0, len(envVars))
 	result = append(result, normalVars...)
 	result = append(result, pathVars...)

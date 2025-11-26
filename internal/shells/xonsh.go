@@ -27,7 +27,10 @@ func (s *XonshShell) GenerateWithKeys(vars []parser.EnvVar, definedKeys map[stri
 		if envVar.IsArray {
 			// Xonsh uses Python-style list syntax
 			var processedValues []string
-			for _, val := range envVar.Values {
+			// Check if last value is a self-reference
+			hasSelfRef := false
+			var selfRefIdx int
+			for i, val := range envVar.Values {
 				var expanded string
 				if definedKeys != nil {
 					expanded = parser.ExpandEnvVarWithDefined(val, envVar.Key, definedKeys)
@@ -36,14 +39,35 @@ func (s *XonshShell) GenerateWithKeys(vars []parser.EnvVar, definedKeys map[stri
 				}
 				// Check if this is a self-reference
 				if expanded == "$"+envVar.Key {
-					// Xonsh uses $VAR for expansion, spread with *
-					processedValues = append(processedValues, "*$"+envVar.Key)
+					hasSelfRef = true
+					selfRefIdx = i
+					break
 				} else {
 					processedValues = append(processedValues, fmt.Sprintf("'%s'", escapeXonshString(expanded)))
 				}
 			}
-			value := strings.Join(processedValues, ", ")
-			sb.WriteString(fmt.Sprintf("$%s = [%s]\n", envVar.Key, value))
+
+			// Handle self-reference by concatenation
+			if hasSelfRef {
+				// Build list up to self-reference, then concatenate with existing var
+				if len(processedValues) > 0 {
+					value := strings.Join(processedValues, ", ")
+					sb.WriteString(fmt.Sprintf("$%s = [%s] + $%s\n", envVar.Key, value, envVar.Key))
+				}
+				// Continue processing remaining values after self-reference
+				for i := selfRefIdx + 1; i < len(envVar.Values); i++ {
+					var expanded string
+					if definedKeys != nil {
+						expanded = parser.ExpandEnvVarWithDefined(envVar.Values[i], envVar.Key, definedKeys)
+					} else {
+						expanded = parser.ExpandEnvVar(envVar.Values[i], envVar.Key)
+					}
+					sb.WriteString(fmt.Sprintf("$%s = $%s + ['%s']\n", envVar.Key, envVar.Key, escapeXonshString(expanded)))
+				}
+			} else {
+				value := strings.Join(processedValues, ", ")
+				sb.WriteString(fmt.Sprintf("$%s = [%s]\n", envVar.Key, value))
+			}
 		} else {
 			var expanded string
 			if definedKeys != nil {
@@ -51,7 +75,13 @@ func (s *XonshShell) GenerateWithKeys(vars []parser.EnvVar, definedKeys map[stri
 			} else {
 				expanded = parser.ExpandEnvVar(envVar.Values[0], envVar.Key)
 			}
-			sb.WriteString(fmt.Sprintf("$%s = '%s'\n", envVar.Key, escapeXonshString(expanded)))
+			// Check if the expanded value is a pure variable reference
+			if strings.HasPrefix(expanded, "$") && !strings.ContainsAny(expanded[1:], " \t\n$\"'\\") {
+				// Pure variable reference - don't quote it
+				sb.WriteString(fmt.Sprintf("$%s = %s\n", envVar.Key, expanded))
+			} else {
+				sb.WriteString(fmt.Sprintf("$%s = '%s'\n", envVar.Key, escapeXonshString(expanded)))
+			}
 		}
 	}
 
@@ -79,7 +109,10 @@ func (s *XonshShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[s
 		if envVar.IsArray {
 			// Xonsh uses Python list syntax
 			var processedValues []string
-			for _, val := range envVar.Values {
+			// Check if any value is a self-reference
+			hasSelfRef := false
+			var selfRefIdx int
+			for i, val := range envVar.Values {
 				var expanded string
 				if definedKeys != nil {
 					expanded = parser.ExpandEnvVarWithDefined(val, envVar.Key, definedKeys)
@@ -88,13 +121,35 @@ func (s *XonshShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[s
 				}
 				// Check if this is a self-reference
 				if expanded == "$"+envVar.Key {
-					processedValues = append(processedValues, "$"+envVar.Key)
+					hasSelfRef = true
+					selfRefIdx = i
+					break
 				} else {
 					processedValues = append(processedValues, fmt.Sprintf("\"%s\"", escapeXonshString(expanded)))
 				}
 			}
-			value := strings.Join(processedValues, ", ")
-			sb.WriteString(fmt.Sprintf("$%s = [%s]\n", envVar.Key, value))
+
+			// Handle self-reference by concatenation
+			if hasSelfRef {
+				// Build list up to self-reference, then concatenate with existing var
+				if len(processedValues) > 0 {
+					value := strings.Join(processedValues, ", ")
+					sb.WriteString(fmt.Sprintf("$%s = [%s] + $%s\n", envVar.Key, value, envVar.Key))
+				}
+				// Continue processing remaining values after self-reference
+				for i := selfRefIdx + 1; i < len(envVar.Values); i++ {
+					var expanded string
+					if definedKeys != nil {
+						expanded = parser.ExpandEnvVarWithDefined(envVar.Values[i], envVar.Key, definedKeys)
+					} else {
+						expanded = parser.ExpandEnvVar(envVar.Values[i], envVar.Key)
+					}
+					sb.WriteString(fmt.Sprintf("$%s = $%s + [\"%s\"]\n", envVar.Key, envVar.Key, escapeXonshString(expanded)))
+				}
+			} else {
+				value := strings.Join(processedValues, ", ")
+				sb.WriteString(fmt.Sprintf("$%s = [%s]\n", envVar.Key, value))
+			}
 
 			// Add deduplication call if requested and variable is PATH-like
 			if dedupePath && isPathLikeVar(envVar.Key) {
@@ -107,7 +162,13 @@ func (s *XonshShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[s
 			} else {
 				expanded = parser.ExpandEnvVar(envVar.Values[0], envVar.Key)
 			}
-			sb.WriteString(fmt.Sprintf("$%s = \"%s\"\n", envVar.Key, escapeXonshString(expanded)))
+			// Check if the expanded value is a pure variable reference
+			if strings.HasPrefix(expanded, "$") && !strings.ContainsAny(expanded[1:], " \t\n$\"'\\") {
+				// Pure variable reference - don't quote it
+				sb.WriteString(fmt.Sprintf("$%s = %s\n", envVar.Key, expanded))
+			} else {
+				sb.WriteString(fmt.Sprintf("$%s = \"%s\"\n", envVar.Key, escapeXonshString(expanded)))
+			}
 		}
 	}
 

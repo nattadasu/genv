@@ -76,7 +76,7 @@ func (s *FishShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[st
 	for _, envVar := range vars {
 		if envVar.IsArray {
 			isPATH := strings.ToUpper(envVar.Key) == "PATH"
-			
+
 			if isPATH {
 				// PATH uses Fish's native space-separated array syntax
 				var processedValues []string

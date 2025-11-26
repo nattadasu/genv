@@ -201,7 +201,7 @@ func escapeElvishString(s string) string {
 func convertToElvishDoubleQuoted(s string) string {
 	// This regex finds all occurrences of $VAR or ${VAR}.
 	re := regexp.MustCompile(`\$(?:{([a-zA-Z0-9_]+)}|([a-zA-Z0-9_]+))`)
-	
+
 	matches := re.FindAllStringSubmatchIndex(s, -1)
 	if len(matches) == 0 {
 		// No variables, just return quoted string
@@ -210,7 +210,7 @@ func convertToElvishDoubleQuoted(s string) string {
 
 	var parts []string
 	lastIndex := 0
-	
+
 	for _, match := range matches {
 		// Add the literal part before the variable
 		if match[0] > lastIndex {
