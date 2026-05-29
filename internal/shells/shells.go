@@ -9,9 +9,6 @@ import (
 
 // Shell represents a shell type with its specific syntax
 type Shell interface {
-	Name() string
-	Generate(vars []parser.EnvVar) string
-	GenerateWithKeys(vars []parser.EnvVar, definedKeys map[string]bool) string
 	GenerateWithOptions(vars []parser.EnvVar, definedKeys map[string]bool, dedupePath bool) string
 }
 
@@ -19,7 +16,7 @@ type Shell interface {
 func GetShell(name string) (Shell, error) {
 	switch strings.ToLower(name) {
 	case "sh", "bash", "zsh", "ksh", "ash", "posix":
-		return &PosixShell{shellName: name}, nil
+		return &PosixShell{}, nil
 	case "fish":
 		return &FishShell{}, nil
 	case "powershell", "pwsh":
@@ -29,7 +26,7 @@ func GetShell(name string) (Shell, error) {
 	case "xonsh", "xsh":
 		return &XonshShell{}, nil
 	case "csh", "tcsh":
-		return &CshShell{shellName: name}, nil
+		return &CshShell{}, nil
 	case "cmd", "batch":
 		return &CmdShell{}, nil
 	case "clink":
@@ -43,6 +40,12 @@ func GetShell(name string) (Shell, error) {
 	default:
 		return nil, fmt.Errorf("unsupported shell: %s", name)
 	}
+}
+
+// IsPathLikeVar checks if a key ends with PATH or DIRS
+func IsPathLikeVar(key string) bool {
+	upper := strings.ToUpper(key)
+	return strings.HasSuffix(upper, "PATH") || strings.HasSuffix(upper, "DIRS")
 }
 
 // GetSupportedShells returns a list of all supported shells

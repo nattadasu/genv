@@ -2,7 +2,6 @@ package shells
 
 import (
 	"fmt"
-	"regexp"
 	"runtime"
 	"strings"
 
@@ -11,18 +10,6 @@ import (
 
 // ElvishShell handles Elvish shell
 type ElvishShell struct{}
-
-func (s *ElvishShell) Name() string {
-	return "elvish"
-}
-
-func (s *ElvishShell) Generate(vars []parser.EnvVar) string {
-	return s.GenerateWithKeys(vars, nil)
-}
-
-func (s *ElvishShell) GenerateWithKeys(vars []parser.EnvVar, definedKeys map[string]bool) string {
-	return s.GenerateWithOptions(vars, definedKeys, false)
-}
 
 func (s *ElvishShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[string]bool, dedupePath bool) string {
 	var sb strings.Builder
@@ -125,7 +112,7 @@ func (s *ElvishShell) GenerateWithOptions(vars []parser.EnvVar, definedKeys map[
 				sb.WriteString(fmt.Sprintf("set E:%s = (str:join %s [%s])\n", envVar.Key, pathDelim, value))
 
 				// Add deduplication if requested and PATH-like
-				if dedupePath && isPathLikeVar(envVar.Key) {
+				if dedupePath && IsPathLikeVar(envVar.Key) {
 					sb.WriteString(fmt.Sprintf("set E:%s = (str:join %s [(__genv-dedupe-list [(str:split %s $E:%s)])])\n", envVar.Key, pathDelim, pathDelim, envVar.Key))
 				}
 			}
@@ -157,98 +144,4 @@ fn __genv-dedupe-list {|items|
   put $@result
 }
 `
-}
-
-// elvishQuote quotes a string for Elvish, using the most appropriate quoting style.
-// If the string contains a variable, it uses double quotes and transforms variables
-// from $VAR to $E:VAR format.
-// Otherwise, it uses single quotes if necessary.
-func elvishQuote(s string) string {
-	if strings.Contains(s, "$") {
-		// Check if the string is a single variable expansion, like $VAR or ${VAR}
-		re := regexp.MustCompile(`^\$(?:{([a-zA-Z0-9_]+)}|([a-zA-Z0-9_]+))$`)
-		matches := re.FindStringSubmatch(s)
-
-		if len(matches) > 0 {
-			varName := matches[1]
-			if varName == "" {
-				varName = matches[2]
-			}
-			return "$E:" + varName
-		}
-
-		return convertToElvishDoubleQuoted(s)
-	}
-	return escapeElvishString(s)
-}
-
-// escapeElvishString escapes a string for use in Elvish single quotes.
-func escapeElvishString(s string) string {
-	// Check if string needs quoting. Barewords are fine if they don't contain
-	// special characters.
-	if !strings.ContainsAny(s, " \t\n\"'\\:[]${}") {
-		return s
-	}
-
-	// Use single quotes, and escape single quotes inside by doubling them.
-	s = strings.ReplaceAll(s, "'", "''")
-	return "'" + s + "'"
-}
-
-// convertToElvishDoubleQuoted converts a string with shell variables ($VAR or ${VAR})
-// into Elvish string concatenation with Elvish-style environment variables ($E:VAR).
-// Elvish doesn't support variable interpolation in quotes, so we use concatenation.
-func convertToElvishDoubleQuoted(s string) string {
-	// This regex finds all occurrences of $VAR or ${VAR}.
-	re := regexp.MustCompile(`\$(?:{([a-zA-Z0-9_]+)}|([a-zA-Z0-9_]+))`)
-
-	matches := re.FindAllStringSubmatchIndex(s, -1)
-	if len(matches) == 0 {
-		// No variables, just return quoted string
-		return `"` + escapeForElvishDoubleQuote(s) + `"`
-	}
-
-	var parts []string
-	lastIndex := 0
-
-	for _, match := range matches {
-		// Add the literal part before the variable
-		if match[0] > lastIndex {
-			literalPart := s[lastIndex:match[0]]
-			if literalPart != "" {
-				parts = append(parts, `"`+escapeForElvishDoubleQuote(literalPart)+`"`)
-			}
-		}
-
-		// Get the variable name from the correct capture group.
-		varName := ""
-		if match[2] != -1 { // This was a ${VAR} match
-			varName = s[match[2]:match[3]]
-		} else { // This was a $VAR match
-			varName = s[match[4]:match[5]]
-		}
-
-		// Add the Elvish-style environment variable (unquoted)
-		parts = append(parts, "$E:"+varName)
-
-		lastIndex = match[1]
-	}
-
-	// Add any remaining literal part after the last variable
-	if lastIndex < len(s) {
-		literalPart := s[lastIndex:]
-		if literalPart != "" {
-			parts = append(parts, `"`+escapeForElvishDoubleQuote(literalPart)+`"`)
-		}
-	}
-
-	// Join parts with Elvish string concatenation (no space - direct concatenation)
-	return strings.Join(parts, "")
-}
-
-// escapeForElvishDoubleQuote escapes a string for use inside Elvish double quotes.
-func escapeForElvishDoubleQuote(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `"`, `\"`)
-	return s
 }

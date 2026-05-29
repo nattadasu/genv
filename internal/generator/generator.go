@@ -3,15 +3,30 @@ package generator
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/nattadasu/genv/internal/parser"
 	"github.com/nattadasu/genv/internal/shells"
 )
 
-// Generate creates shell-specific initialization script
-func Generate(shellName string, configPath string, showWarnings bool) (string, error) {
-	return GenerateWithOptions(shellName, configPath, showWarnings, false, false)
+// ParseConfigFile parses the config file and returns sorted environment variables
+func ParseConfigFile(configPath string) (*parser.ParseResult, error) {
+	var result *parser.ParseResult
+	var err error
+
+	if configPath == "" {
+		result, err = parser.ParseGlobalEnv()
+	} else {
+		result, err = parser.ParseEnvFileFromPath(configPath)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse environment file: %w", err)
+	}
+
+	// Sort variables topologically to resolve dependencies
+	result.EnvVars = topologicalSort(result.EnvVars, false)
+
+	return result, nil
 }
 
 // GenerateWithOptions creates shell-specific initialization script with additional options
@@ -20,10 +35,10 @@ func GenerateWithOptions(shellName string, configPath string, showWarnings bool,
 	var result *parser.ParseResult
 	var err error
 
-	if configPath != "" {
-		result, err = parser.ParseEnvFileFromPath(configPath)
-	} else {
+	if configPath == "" {
 		result, err = parser.ParseGlobalEnv()
+	} else {
+		result, err = parser.ParseEnvFileFromPath(configPath)
 	}
 
 	if err != nil {
@@ -193,7 +208,7 @@ func movePathVarsToEnd(envVars []parser.EnvVar) []parser.EnvVar {
 	var normalVars []parser.EnvVar
 
 	for _, v := range envVars {
-		if isPathLikeKey(v.Key) {
+		if shells.IsPathLikeVar(v.Key) {
 			pathVars = append(pathVars, v)
 		} else {
 			normalVars = append(normalVars, v)
@@ -204,10 +219,4 @@ func movePathVarsToEnd(envVars []parser.EnvVar) []parser.EnvVar {
 	result = append(result, normalVars...)
 	result = append(result, pathVars...)
 	return result
-}
-
-// isPathLikeKey checks if a key ends with PATH or DIRS
-func isPathLikeKey(key string) bool {
-	upper := strings.ToUpper(key)
-	return strings.HasSuffix(upper, "PATH") || strings.HasSuffix(upper, "DIRS")
 }

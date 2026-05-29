@@ -1,102 +1,152 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/nattadasu/genv/internal/generator"
-	"github.com/nattadasu/genv/internal/shells"
+	"github.com/nattadasu/genv/internal/parser"
+	"github.com/spf13/cobra"
 )
 
 const version = "1.0.0"
 
-func main() {
-	if len(os.Args) < 2 {
-		printUsage()
-		os.Exit(1)
-	}
+var (
+	configPath   string
+	showWarnings bool
+	dedupePath   bool
+	sortKeys     bool
+)
 
-	command := os.Args[1]
+var rootCmd = &cobra.Command{
+	Use:   "genv",
+	Short: "A fricking damn simple and fast user-scope global env loader",
+	Long: `genv is a command-line tool to manage global environment variables
+for different shells.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		cmd.Help()
+	},
+}
 
-	switch command {
-	case "init":
-		handleInitCommand()
-
-	case "install-nu":
-		handleInstallNushell()
-
-	case "version", "--version", "-v":
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Print the version number of genv",
+	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("genv version %s\n", version)
-
-	case "help", "--help", "-h":
-		printUsage()
-
-	default:
-		fmt.Fprintf(os.Stderr, "Error: unknown command '%s'\n", command)
-		printUsage()
-		os.Exit(1)
-	}
+	},
 }
 
-func handleInitCommand() {
-	initCmd := flag.NewFlagSet("init", flag.ExitOnError)
-	configPath := initCmd.String("path", "", "Path to custom config file (default: ~/.genv.env)")
-	showWarnings := initCmd.Bool("warnings", false, "Show warnings about variable references")
-	dedupePath := initCmd.Bool("dedupe-path", false, "Remove duplicate entries from PATH-like variables")
-	sortKeys := initCmd.Bool("sort", false, "Sort variables alphabetically within dependency levels")
-	showHelp := initCmd.Bool("help", false, "Show help for init command")
-
-	if err := initCmd.Parse(os.Args[2:]); err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing flags: %v\n", err)
-		os.Exit(1)
-	}
-
-	if *showHelp {
-		printInitHelp()
-		return
-	}
-
-	if initCmd.NArg() < 1 {
-		fmt.Fprintf(os.Stderr, "Error: missing shell argument\n")
-		fmt.Fprintf(os.Stderr, "Usage: genv init [options] <shell>\n")
-		fmt.Fprintf(os.Stderr, "Run 'genv init --help' for more information\n")
-		os.Exit(1)
-	}
-
-	shellName := initCmd.Arg(0)
-	handleInit(shellName, *configPath, *showWarnings, *dedupePath, *sortKeys)
+var initCmd = &cobra.Command{
+	Use:   "init [shell]",
+	Short: "Generate shell initialization script",
+	Long: `Generate a shell-specific initialization script that can be sourced
+to load the environment variables.`,
+	Args: cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		shellName := args[0]
+		script, err := generator.GenerateWithOptions(shellName, configPath, showWarnings, dedupePath, sortKeys)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Print(script)
+	},
 }
 
-func handleInit(shellName, configPath string, showWarnings, dedupePath, sortKeys bool) {
-	script, err := generator.GenerateWithOptions(shellName, configPath, showWarnings, dedupePath, sortKeys)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+var installNuCmd = &cobra.Command{
+	Use:   "install-nu",
+	Short: "Configure genv for Nushell",
+	Long: `This command automatically configures Nushell to load genv on startup by
+adding the necessary lines to your env.nu file.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		handleInstallNushell()
+	},
+}
+
+var runCmd = &cobra.Command{
+	Use:                "run [command] [args...]",
+	Short:              "Run a command with loaded environment variables",
+	Long: `Load environment variables from the config file and execute the specified command.
+This is similar to the 'env' utility but loads variables from ~/.genv.env.
+
+Examples:
+  genv run bash -c 'echo $MY_VAR'
+  genv run --path custom.env python script.py
+  genv run node app.js`,
+	DisableFlagParsing: true,
+	Run: func(cmd *cobra.Command, args []string) {
+		handleCommandRun(args)
+	},
+}
+
+var completionCmd = &cobra.Command{
+	Use:   "completion [shell]",
+	Short: "Generate completion script for your shell",
+	Long: `To load completions:
+
+Bash:
+  $ source <(genv completion bash)
+
+Zsh:
+  $ source <(genv completion zsh)
+
+Fish:
+  $ genv completion fish | source
+
+PowerShell:
+  $ genv completion powershell | Out-String | Invoke-Expression
+
+To load completions for other shells, use the 'custom' subcommand.
+`,
+	ValidArgs: []string{"bash", "zsh", "fish", "powershell"},
+	Args:      cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		switch args[0] {
+		case "bash":
+			cmd.Root().GenBashCompletion(os.Stdout)
+		case "zsh":
+			cmd.Root().GenZshCompletion(os.Stdout)
+		case "fish":
+			cmd.Root().GenFishCompletion(os.Stdout, true)
+		case "powershell":
+			cmd.Root().GenPowerShellCompletion(os.Stdout)
+		default:
+			fmt.Fprintf(os.Stderr, "Error: unsupported shell for completion: %s\n", args[0])
+			os.Exit(1)
+		}
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(initCmd)
+	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(installNuCmd)
+	rootCmd.AddCommand(completionCmd)
+	completionCmd.AddCommand(customCompletionCmd)
+
+	initCmd.Flags().StringVar(&configPath, "path", "", "Path to custom config file (default: ~/.genv.env)")
+	initCmd.Flags().BoolVar(&showWarnings, "warnings", false, "Show warnings about variable references")
+	initCmd.Flags().BoolVar(&dedupePath, "dedupe-path", false, "Remove duplicate entries from PATH-like variables")
+	initCmd.Flags().BoolVar(&sortKeys, "sort", false, "Sort variables alphabetically within dependency levels")
+
+	runCmd.Flags().StringVar(&configPath, "path", "", "Path to custom config file (default: ~/.genv.env)")
+	runCmd.Flags().BoolVar(&showWarnings, "warnings", false, "Show warnings about variable references")
+
+	installNuCmd.Flags().StringVar(&configPath, "path", "", "Path to custom config file (default: ~/.genv.env)")
+	installNuCmd.Flags().BoolVar(&dedupePath, "dedupe-path", false, "Remove duplicate entries from PATH-like variables")
+	installNuCmd.Flags().BoolVar(&sortKeys, "sort", false, "Sort variables alphabetically within dependency levels")
+}
+
+func main() {
+	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
-
-	fmt.Print(script)
 }
 
 func handleInstallNushell() {
-	installCmd := flag.NewFlagSet("install-nu", flag.ExitOnError)
-	configPath := installCmd.String("path", "", "Path to custom config file (default: ~/.genv.env)")
-	dedupePath := installCmd.Bool("dedupe-path", false, "Remove duplicate entries from PATH-like variables")
-	sortKeys := installCmd.Bool("sort", false, "Sort variables alphabetically within dependency levels")
-	showHelp := installCmd.Bool("help", false, "Show help for install-nu command")
-
-	if err := installCmd.Parse(os.Args[2:]); err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing flags: %v\n", err)
-		os.Exit(1)
-	}
-
-	if *showHelp {
-		printInstallNushellHelp()
-		return
-	}
-
 	// Check if nushell is installed and get config directory
 	configDir, err := executeCommand("nu", "-n", "-c", "print $nu.default-config-dir")
 	if err != nil {
@@ -124,13 +174,13 @@ func handleInstallNushell() {
 	var genvCmd strings.Builder
 	genvCmd.WriteString(genvPath)
 	genvCmd.WriteString(" init")
-	if *configPath != "" {
-		genvCmd.WriteString(fmt.Sprintf(" --path %s", *configPath))
+	if configPath != "" {
+		genvCmd.WriteString(fmt.Sprintf(" --path %s", configPath))
 	}
-	if *dedupePath {
+	if dedupePath {
 		genvCmd.WriteString(" --dedupe-path")
 	}
-	if *sortKeys {
+	if sortKeys {
 		genvCmd.WriteString(" --sort")
 	}
 	genvCmd.WriteString(" nu")
@@ -171,7 +221,7 @@ func handleInstallNushell() {
 
 	// Generate initial genv.nu file so it exists when nushell first loads
 	genvNuPath := configDir + "/genv.nu"
-	initialScript, err := generator.GenerateWithOptions("nushell", *configPath, false, *dedupePath, *sortKeys)
+	initialScript, err := generator.GenerateWithOptions("nushell", configPath, false, dedupePath, sortKeys)
 	if err == nil {
 		os.WriteFile(genvNuPath, []byte(initialScript), 0644)
 	}
@@ -193,107 +243,148 @@ func executeCommand(name string, args ...string) (string, error) {
 	return string(output), nil
 }
 
-func printInstallNushellHelp() {
-	fmt.Println("genv install-nu - Configure genv for Nushell")
-	fmt.Println()
-	fmt.Println("Usage:")
-	fmt.Println("  genv install-nu [options]")
-	fmt.Println()
-	fmt.Println("This command automatically configures Nushell to load genv on startup by")
-	fmt.Println("adding the necessary lines to your env.nu file.")
-	fmt.Println()
-	fmt.Println("Options:")
-	fmt.Println()
-	fmt.Println("  --path <file>")
-	fmt.Println("      Use custom config file instead of ~/.genv.env")
-	fmt.Println()
-	fmt.Println("  --dedupe-path")
-	fmt.Println("      Remove duplicate PATH entries")
-	fmt.Println()
-	fmt.Println("  --sort")
-	fmt.Println("      Sort variables alphabetically within each dependency level")
-	fmt.Println()
-	fmt.Println("Examples:")
-	fmt.Println()
-	fmt.Println("  Basic installation:")
-	fmt.Println("    genv install-nu")
-	fmt.Println()
-	fmt.Println("  With deduplication:")
-	fmt.Println("    genv install-nu --dedupe-path")
-	fmt.Println()
-	fmt.Println("  With custom config:")
-	fmt.Println("    genv install-nu --path ~/work/.env --dedupe-path")
-	fmt.Println()
-	fmt.Println("What it does:")
-	fmt.Println("  Adds these lines to your env.nu:")
-	fmt.Println("    genv init nu | save -f ($nu.default-config-dir | path join \"genv.nu\")")
-	fmt.Println("    source ($nu.default-config-dir | path join \"genv.nu\")")
+// handleCommandRun parses flags and executes the command with loaded environment
+func handleCommandRun(args []string) {
+	// Parse flags manually
+	var customConfigPath string
+	var showWarningsFlag bool
+	var cmdArgs []string
+
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--path" && i+1 < len(args) {
+			customConfigPath = args[i+1]
+			i++ // Skip next arg
+		} else if strings.HasPrefix(arg, "--path=") {
+			customConfigPath = strings.TrimPrefix(arg, "--path=")
+		} else if arg == "--warnings" {
+			showWarningsFlag = true
+		} else {
+			// Rest are command arguments
+			cmdArgs = args[i:]
+			break
+		}
+	}
+
+	if len(cmdArgs) == 0 {
+		fmt.Fprintf(os.Stderr, "Error: no command specified\n")
+		os.Exit(1)
+	}
+
+	handleCommandForwarding(cmdArgs, customConfigPath, showWarningsFlag)
 }
 
-func printUsage() {
-	fmt.Println("genv - A fricking damn simple and fast user-scope global env loader")
-	fmt.Println()
-	fmt.Println("Usage:")
-	fmt.Println("  genv init [options] <shell>    Generate shell initialization script")
-	fmt.Println("  genv install-nu [options]      Install genv for Nushell")
-	fmt.Println("  genv version                   Show version")
-	fmt.Println("  genv help                      Show this help")
-	fmt.Println()
-	fmt.Println("Options:")
-	fmt.Println("  --path <file>      Custom config file (default: ~/.genv.env)")
-	fmt.Println("  --dedupe-path      Remove duplicate PATH entries")
-	fmt.Println("  --sort             Sort variables alphabetically")
-	fmt.Println("  --warnings         Show configuration warnings")
-	fmt.Println("  --help             Detailed help for init command")
-	fmt.Println()
-	fmt.Println("Supported shells:")
-	fmt.Println("  " + strings.Join(shells.GetSupportedShells(), ", "))
-	fmt.Println()
-	fmt.Println("Examples:")
-	fmt.Println("  genv init bash")
-	fmt.Println("  genv init --dedupe-path fish")
-	fmt.Println("  genv init --path custom.env zsh")
-	fmt.Println()
-	fmt.Println("Config file: ~/.genv.env (TOML format)")
-	fmt.Println("Documentation: https://github.com/nattadasu/genv")
+// handleCommandForwarding loads environment variables and executes the given command
+func handleCommandForwarding(args []string, cfgPath string, warnings bool) {
+	if len(args) == 0 {
+		fmt.Fprintf(os.Stderr, "Error: no command specified\n")
+		os.Exit(1)
+	}
+
+	// Parse the configuration file
+	oldConfigPath := configPath
+	configPath = cfgPath
+	result, err := parseConfig()
+	configPath = oldConfigPath
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Output warnings to stderr if requested
+	if warnings && len(result.Warnings) > 0 {
+		for _, warning := range result.Warnings {
+			fmt.Fprintln(os.Stderr, warning)
+		}
+	}
+
+	// Apply environment variables to current environment
+	envMap := buildEnvironmentMap(result.EnvVars)
+	
+	// Create the command with inherited environment plus our variables
+	cmd := exec.Command(args[0], args[1:]...)
+	cmd.Env = mergeEnvironment(os.Environ(), envMap)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	// Execute the command
+	err = cmd.Run()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			os.Exit(exitErr.ExitCode())
+		}
+		fmt.Fprintf(os.Stderr, "Error executing command: %v\n", err)
+		os.Exit(1)
+	}
 }
 
-func printInitHelp() {
-	fmt.Println("genv init - Generate shell initialization script")
-	fmt.Println()
-	fmt.Println("Usage:")
-	fmt.Println("  genv init [options] <shell>")
-	fmt.Println()
-	fmt.Println("Options:")
-	fmt.Println()
-	fmt.Println("  --path <file>")
-	fmt.Println("      Use custom config file instead of ~/.genv.env")
-	fmt.Println()
-	fmt.Println("  --dedupe-path")
-	fmt.Println("      Remove duplicate PATH entries at runtime")
-	fmt.Println("      Supported: bash, zsh, fish, pwsh, nu, xonsh")
-	fmt.Println()
-	fmt.Println("  --sort")
-	fmt.Println("      Sort variables alphabetically within each dependency level")
-	fmt.Println("      Note: Variables are already sorted by dependencies automatically")
-	fmt.Println()
-	fmt.Println("  --warnings")
-	fmt.Println("      Show warnings about config issues")
-	fmt.Println()
-	fmt.Println("Supported shells:")
-	fmt.Println("  " + strings.Join(shells.GetSupportedShells(), ", "))
-	fmt.Println()
-	fmt.Println("Examples:")
-	fmt.Println()
-	fmt.Println("  Basic usage:")
-	fmt.Println("    genv init bash")
-	fmt.Println()
-	fmt.Println("  Custom config:")
-	fmt.Println("    genv init --path ~/work/.env zsh")
-	fmt.Println()
-	fmt.Println("  Remove duplicates:")
-	fmt.Println("    genv init --dedupe-path fish")
-	fmt.Println()
-	fmt.Println("  Multiple options:")
-	fmt.Println("    genv init --path custom.env --dedupe-path --warnings bash")
+// parseConfig reads and parses the configuration file
+func parseConfig() (*parser.ParseResult, error) {
+	return generator.ParseConfigFile(configPath)
+}
+
+// buildEnvironmentMap converts EnvVars to a map with resolved values
+func buildEnvironmentMap(envVars []parser.EnvVar) map[string]string {
+	envMap := make(map[string]string)
+	
+	for _, envVar := range envVars {
+		// Expand variables in values
+		expanded := make([]string, len(envVar.Values))
+		for i, val := range envVar.Values {
+			expanded[i] = os.ExpandEnv(val)
+		}
+		
+		if envVar.IsArray {
+			// Join array values with OS-specific path separator
+			sep := ":"
+			if strings.Contains(strings.ToLower(os.Getenv("OS")), "windows") {
+				sep = ";"
+			}
+			envMap[envVar.Key] = strings.Join(expanded, sep)
+		} else {
+			envMap[envVar.Key] = expanded[0]
+		}
+	}
+	
+	return envMap
+}
+
+// mergeEnvironment merges current environment with new variables
+func mergeEnvironment(currentEnv []string, newVars map[string]string) []string {
+	// Parse current environment into a map
+	envMap := make(map[string]string)
+	for _, entry := range currentEnv {
+		parts := strings.SplitN(entry, "=", 2)
+		if len(parts) == 2 {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+	
+	// Merge with new variables, resolving any references
+	for key, value := range newVars {
+		// Expand references using the combined environment
+		expanded := value
+		for envKey, envVal := range envMap {
+			expanded = strings.ReplaceAll(expanded, "$"+envKey, envVal)
+			expanded = strings.ReplaceAll(expanded, "${"+envKey+"}", envVal)
+		}
+		// Also resolve against newly set variables
+		for envKey, envVal := range newVars {
+			if envKey != key {
+				expanded = strings.ReplaceAll(expanded, "$"+envKey, envVal)
+				expanded = strings.ReplaceAll(expanded, "${"+envKey+"}", envVal)
+			}
+		}
+		envMap[key] = expanded
+	}
+	
+	// Convert back to []string
+	result := make([]string, 0, len(envMap))
+	for key, value := range envMap {
+		result = append(result, key+"="+value)
+	}
+	
+	return result
 }

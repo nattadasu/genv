@@ -68,7 +68,7 @@ PATH = [
 
 	for _, tt := range tests {
 		t.Run(tt.shell, func(t *testing.T) {
-			output, err := Generate(tt.shell, "", false)
+			output, err := GenerateWithOptions(tt.shell, "", false, false, false)
 			if err != nil {
 				t.Fatalf("Generate(%q) failed: %v", tt.shell, err)
 			}
@@ -94,7 +94,7 @@ func TestGenerateFileNotFound(t *testing.T) {
 		}
 	}()
 
-	_, err := Generate("bash", "", false)
+	_, err := GenerateWithOptions("bash", "", false, false, false)
 	if err == nil {
 		t.Error("Expected error when config file doesn't exist")
 	}
@@ -121,7 +121,7 @@ func TestGenerateUnsupportedShell(t *testing.T) {
 		t.Fatalf("Failed to create test config: %v", err)
 	}
 
-	_, err := Generate("unsupported_shell", "", false)
+	_, err := GenerateWithOptions("unsupported_shell", "", false, false, false)
 	if err == nil {
 		t.Error("Expected error for unsupported shell")
 	}

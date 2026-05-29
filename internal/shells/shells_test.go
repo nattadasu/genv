@@ -64,13 +64,13 @@ func TestGetSupportedShells(t *testing.T) {
 }
 
 func TestPosixShellGenerate(t *testing.T) {
-	shell := &PosixShell{shellName: "bash"}
+	shell := &PosixShell{}
 	vars := []parser.EnvVar{
 		{Key: "EDITOR", Values: []string{"/usr/bin/vim"}, IsArray: false},
 		{Key: "PATH", Values: []string{"$PATH", "/usr/local/bin"}, IsArray: true},
 	}
 
-	output := shell.Generate(vars)
+	output := shell.GenerateWithOptions(vars, nil, false)
 
 	if !strings.Contains(output, "export EDITOR=\"/usr/bin/vim\"") {
 		t.Error("Output should contain EDITOR export")
@@ -92,7 +92,7 @@ func TestFishShellGenerate(t *testing.T) {
 		{Key: "PATH", Values: []string{"$PATH", "/usr/local/bin"}, IsArray: true},
 	}
 
-	output := shell.Generate(vars)
+	output := shell.GenerateWithOptions(vars, nil, false)
 
 	if !strings.Contains(output, "set -gx EDITOR") {
 		t.Error("Output should contain EDITOR set command")
@@ -110,7 +110,7 @@ func TestPowerShellGenerate(t *testing.T) {
 		{Key: "PATH", Values: []string{"$PATH", "C:\\bin"}, IsArray: true},
 	}
 
-	output := shell.Generate(vars)
+	output := shell.GenerateWithOptions(vars, nil, false)
 
 	if !strings.Contains(output, "$env:EDITOR") {
 		t.Error("Output should contain EDITOR assignment")
@@ -138,7 +138,7 @@ func TestNushellGenerate(t *testing.T) {
 		{Key: "PATH", Values: []string{"$PATH", "/usr/local/bin"}, IsArray: true},
 	}
 
-	output := shell.Generate(vars)
+	output := shell.GenerateWithOptions(vars, nil, false)
 
 	if !strings.Contains(output, "$env.EDITOR") {
 		t.Error("Output should contain EDITOR assignment")
@@ -160,7 +160,7 @@ func TestXonshGenerate(t *testing.T) {
 		{Key: "TEST_ARRAY", Values: []string{"val1", "val2"}, IsArray: true},
 	}
 
-	output := shell.Generate(vars)
+	output := shell.GenerateWithOptions(vars, nil, false)
 
 	if !strings.Contains(output, "$EDITOR") {
 		t.Error("Output should contain EDITOR assignment")
@@ -172,13 +172,13 @@ func TestXonshGenerate(t *testing.T) {
 }
 
 func TestCshShellGenerate(t *testing.T) {
-	shell := &CshShell{shellName: "csh"}
+	shell := &CshShell{}
 	vars := []parser.EnvVar{
 		{Key: "EDITOR", Values: []string{"/usr/bin/vim"}, IsArray: false},
 		{Key: "PATH", Values: []string{"$PATH", "/usr/local/bin"}, IsArray: true},
 	}
 
-	output := shell.Generate(vars)
+	output := shell.GenerateWithOptions(vars, nil, false)
 
 	if !strings.Contains(output, "setenv EDITOR") {
 		t.Error("Output should contain setenv EDITOR")
@@ -196,7 +196,7 @@ func TestCmdShellGenerate(t *testing.T) {
 		{Key: "PATH", Values: []string{"$PATH", "C:\\bin"}, IsArray: true},
 	}
 
-	output := shell.Generate(vars)
+	output := shell.GenerateWithOptions(vars, nil, false)
 
 	if !strings.Contains(output, "set \"EDITOR=") {
 		t.Error("Output should contain set EDITOR")
@@ -219,7 +219,7 @@ func TestIonShellGenerate(t *testing.T) {
 		{Key: "TEST_ARRAY", Values: []string{"val1", "val2"}, IsArray: true},
 	}
 
-	output := shell.Generate(vars)
+	output := shell.GenerateWithOptions(vars, nil, false)
 
 	if !strings.Contains(output, "export EDITOR") {
 		t.Error("Output should contain export EDITOR")
@@ -238,7 +238,7 @@ func TestRcShellGenerate(t *testing.T) {
 		{Key: "PATH", Values: []string{"$PATH", "/usr/local/bin"}, IsArray: true},
 	}
 
-	output := shell.Generate(vars)
+	output := shell.GenerateWithOptions(vars, nil, false)
 
 	if !strings.Contains(output, "EDITOR=") {
 		t.Error("Output should contain EDITOR assignment")
@@ -265,7 +265,7 @@ func TestElvishShellGenerate(t *testing.T) {
 		definedKeys[v.Key] = true
 	}
 
-	output := shell.GenerateWithKeys(vars, definedKeys)
+	output := shell.GenerateWithOptions(vars, definedKeys, false)
 
 	// 1. Simple variable
 	expectedSimple := "set E:FOO = bar\n"
